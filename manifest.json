@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Faminto WhatsApp com Imagens e Carrinho",
+  "version": "4.0",
+  "description": "Mostra produtos e entregas da Faminto no WhatsApp com imagens e carrinho",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://pedidos.faminto.app/*",
+    "https://cdn.faminto.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["placeholder.svg"],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
