@@ -587,3 +587,237 @@
     cursor: not-allowed;
     transform: none;
 }
+
+/* Adicionar ao final do styles.css existente */
+
+/* Controles de quantidade para sabores */
+.quantity-controls-sabor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.qty-btn-sabor {
+    background: #444;
+    border: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+    transition: all 0.2s;
+}
+
+.qty-btn-sabor:hover:not(:disabled) {
+    background: #555;
+}
+
+.qty-btn-sabor.add {
+    background: #25D366;
+    color: white;
+}
+
+.qty-btn-sabor.add:hover {
+    background: #20b358;
+}
+
+.qty-btn-sabor.remove {
+    background: #dc3545;
+    color: white;
+}
+
+.qty-btn-sabor.remove:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.qty-btn-sabor:disabled {
+    background: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.quantity-sabor {
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    color: #e0e0e0;
+    font-size: 14px;
+}
+
+/* Controles de quantidade para complementos */
+.quantity-controls-complemento {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.qty-btn-complemento {
+    background: #444;
+    border: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+    transition: all 0.2s;
+}
+
+.qty-btn-complemento:hover:not(:disabled) {
+    background: #555;
+}
+
+.qty-btn-complemento.add {
+    background: #25D366;
+    color: white;
+}
+
+.qty-btn-complemento.add:hover {
+    background: #20b358;
+}
+
+.qty-btn-complemento.remove {
+    background: #dc3545;
+    color: white;
+}
+
+.qty-btn-complemento.remove:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.qty-btn-complemento:disabled {
+    background: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.quantity-complemento {
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    color: #e0e0e0;
+    font-size: 14px;
+}
+
+/* Ajustes para layout dos itens */
+.sabor-item, .complemento-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #1d1d1d;
+    border-radius: 6px;
+    border: 1px solid #555;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+}
+
+.sabor-item.selected, .complemento-item.selected {
+    background: #2d2d2d;
+    border-color: #25D366;
+}
+
+.sabor-info, .complemento-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-right: 10px;
+}
+
+/* Melhorar indicação visual de limite */
+.limite-info {
+    color: #bbb;
+    font-size: 12px;
+    margin: 5px 0 0 0;
+    padding: 8px;
+    background: #2d2d2d;
+    border-radius: 4px;
+    border-left: 3px solid #25D366;
+}
+
+.contador-sabores {
+    font-size: 11px;
+    color: #25D366;
+    font-weight: bold;
+    margin-top: 5px;
+    padding: 4px 8px;
+    background: rgba(37, 211, 102, 0.1);
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Responsividade para controles */
+@media (max-width: 400px) {
+    .sabor-item, .complemento-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .quantity-controls-sabor, .quantity-controls-complemento {
+        justify-content: center;
+    }
+    
+    .sabor-info, .complemento-info {
+        margin-right: 0;
+        text-align: center;
+    }
+}
+/* Adicionar ao final do styles.css existente */
+
+.sabor-desc {
+    font-size: 10px;
+    color: #999;
+    display: block;
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.sabor-item.selected .sabor-desc {
+    color: #ddd;
+}
+
+.produto-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.add-btn, .customize-btn {
+    flex: 1;
+    min-width: 60px;
+}
+
+.sabor-info, .complemento-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Melhorar responsividade dos cards de produto */
+@media (max-width: 400px) {
+    .faminto-panel {
+        width: calc(100vw - 30px);
+        right: 15px;
+    }
+    
+    .produto-actions {
+        flex-direction: column;
+    }
+    
+    .add-btn, .customize-btn {
+        width: 100%;
+    }
+}

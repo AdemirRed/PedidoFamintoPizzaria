@@ -7,8 +7,8 @@
     let montagemProduto = null;
     let produtosApi = [];
     let gruposApi = [];
-    let saboresSelecionados = [];
-    let complementosSelecionados = [];
+    let saboresSelecionados = {}; // Mudança: agora é objeto com quantidades
+    let complementosSelecionados = {}; // Mudança: agora é objeto com quantidades
 
     // Carregar imagem com fallback
     function loadImage(imgElement, url) {
@@ -85,11 +85,43 @@
         return match ? parseInt(match[1]) : 1;
     }
 
-    // Extrair ID da categoria do produto para buscar complementos
-    function extractCategoryId(nome, allProducts) {
-        // Tentar encontrar o produto na lista e pegar seu ID de categoria
-        const produto = allProducts.find(p => p.nome === nome);
-        return produto?.id || null;
+    // Detectar tipo de complemento baseado no nome
+    function detectarTipoComplemento(complementos) {
+        const complementosLower = complementos.map(c => c.toLowerCase());
+
+        // Palavras-chave para bordas
+        const palavrasBorda = [
+            'borda', 'catupiry', 'cheddar', 'chocolate', 'doce de leite',
+            'nutella', 'morango', 'banana', 'cream cheese', 'requeijão'
+        ];
+
+        // Verificar se algum complemento é borda
+        const temBorda = complementosLower.some(comp =>
+            palavrasBorda.some(palavra => comp.includes(palavra))
+        );
+
+        return temBorda ? 'Bordas' : 'Complementos';
+    }
+
+    // Detectar se produto é pizza
+    function isPizzaProduct(nome) {
+        const nomeMin = nome.toLowerCase();
+        return nomeMin.includes('pizza') ||
+            nomeMin.includes('fatias') ||
+            nomeMin.includes('sabor');
+    }
+
+    // Escolher emoji baseado no tipo de produto
+    function escolherEmoji(nome) {
+        const nomeMin = nome.toLowerCase();
+
+        if (isPizzaProduct(nome)) return '🍕';
+        if (nomeMin.includes('combo') || nomeMin.includes('lanche')) return '🍔';
+        if (nomeMin.includes('fritas') || nomeMin.includes('batata')) return '🍟';
+        if (nomeMin.includes('refrigerante') || nomeMin.includes('coca') || nomeMin.includes('suco')) return '🥤';
+        if (nomeMin.includes('sobremesa') || nomeMin.includes('doce') || nomeMin.includes('açaí')) return '🍰';
+
+        return '🍽️'; // emoji padrão
     }
 
     function addToCart(produto) {
@@ -255,6 +287,7 @@
                         <li>Clique em "Carregar Cardápio" e cole a URL do restaurante</li>
                         <li>Navegue pelos produtos e adicione ao carrinho</li>
                         <li>Para pizzas, combos e fritas, use "Personalizar"</li>
+                        <li>Use +/- para escolher quantas partes de cada sabor</li>
                         <li>Finalize o pedido enviando para o WhatsApp</li>
                     </ul>
                 </div>
@@ -384,7 +417,7 @@
             <div class="produto-base">
                 <h3>🍕 ${montagemProduto.nome}</h3>
                 <p class="preco-base">${montagemProduto.preco}</p>
-                <p class="limite-info">Escolha até ${limiteSabores} sabor(es)</p>
+                <p class="limite-info">Escolha sabores (máx: ${limiteSabores} partes) - Mínimo: 1 sabor</p>
             </div>
         `;
 
@@ -400,16 +433,20 @@
 
                     tipoSabor.produtos.forEach(sabor => {
                         const preco = sabor.valorVenda > 0 ? `R$ ${sabor.valorVenda.toFixed(2).replace('.', ',')}` : '';
+                        const quantidade = saboresSelecionados[sabor.id] || 0;
+
                         html += `
-                            <div class="sabor-item" data-sabor-id="${sabor.id}" data-tipo="${tipoSabor.id}">
+                            <div class="sabor-item ${quantidade > 0 ? 'selected' : ''}" data-sabor-id="${sabor.id}" data-tipo="${tipoSabor.id}">
                                 <div class="sabor-info">
                                     <span class="sabor-nome">${sabor.nome}</span>
                                     ${sabor.textocomposicao ? `<span class="sabor-desc">${sabor.textocomposicao}</span>` : ''}
                                     ${preco ? `<span class="sabor-preco">${preco}</span>` : ''}
                                 </div>
-                                <button class="sabor-btn" data-action="toggle-sabor" data-id="${sabor.id}">
-                                    Selecionar
-                                </button>
+                                <div class="quantity-controls-sabor">
+                                    <button class="qty-btn-sabor remove" data-action="remove-sabor" data-id="${sabor.id}" ${quantidade === 0 ? 'disabled' : ''}>-</button>
+                                    <span class="quantity-sabor">${quantidade}</span>
+                                    <button class="qty-btn-sabor add" data-action="add-sabor" data-id="${sabor.id}">+</button>
+                                </div>
                             </div>
                         `;
                     });
@@ -446,15 +483,19 @@
 
                     grupo.produtos.forEach(complemento => {
                         const preco = complemento.valorVenda > 0 ? `R$ ${complemento.valorVenda.toFixed(2).replace('.', ',')}` : '';
+                        const quantidade = complementosSelecionados[complemento.id] || 0;
+
                         html += `
-                            <div class="complemento-item" data-complemento-id="${complemento.id}" data-grupo="${grupo.id}">
+                            <div class="complemento-item ${quantidade > 0 ? 'selected' : ''}" data-complemento-id="${complemento.id}" data-grupo="${grupo.id}">
                                 <div class="complemento-info">
                                     <span class="complemento-nome">${complemento.nome}</span>
                                     ${preco ? `<span class="complemento-preco">${preco}</span>` : ''}
                                 </div>
-                                <button class="complemento-btn" data-action="toggle-complemento" data-id="${complemento.id}" data-grupo="${grupo.id}">
-                                    Selecionar
-                                </button>
+                                <div class="quantity-controls-complemento">
+                                    <button class="qty-btn-complemento remove" data-action="remove-complemento" data-id="${complemento.id}" data-grupo="${grupo.id}" ${quantidade === 0 ? 'disabled' : ''}>-</button>
+                                    <span class="quantity-complemento">${quantidade}</span>
+                                    <button class="qty-btn-complemento add" data-action="add-complemento" data-id="${complemento.id}" data-grupo="${grupo.id}">+</button>
+                                </div>
                             </div>
                         `;
                     });
@@ -474,7 +515,7 @@
                     <div id="sabores-selecionados"></div>
                     <div id="complementos-selecionados"></div>
                 </div>
-                <button id="finalizar-montagem" class="finalizar-btn" ${produtosApi.length > 0 ? 'disabled' : ''} data-action="finalizar-montagem">
+                <button id="finalizar-montagem" class="finalizar-btn" disabled data-action="finalizar-montagem">
                     Adicionar ao Carrinho
                 </button>
             </div>
@@ -493,30 +534,60 @@
     }
 
     function setupMontagemEvents() {
-        // Eventos para sabores
-        panel.querySelectorAll('[data-action="toggle-sabor"]').forEach(btn => {
+        // Eventos para sabores (adicionar)
+        panel.querySelectorAll('[data-action="add-sabor"]').forEach(btn => {
             btn.onclick = () => {
                 const saborId = btn.dataset.id;
                 const limiteSabores = getLimiteSabores(montagemProduto.nome);
 
-                if (saboresSelecionados.includes(saborId)) {
-                    saboresSelecionados = saboresSelecionados.filter(id => id !== saborId);
-                    btn.textContent = 'Selecionar';
-                    btn.parentElement.classList.remove('selected');
-                } else if (saboresSelecionados.length < limiteSabores) {
-                    saboresSelecionados.push(saborId);
-                    btn.textContent = 'Remover';
-                    btn.parentElement.classList.add('selected');
-                } else {
-                    alert(`Você já selecionou o máximo de ${limiteSabores} sabor(es)`);
-                }
+                // Calcular total de partes já selecionadas
+                const totalPartes = Object.values(saboresSelecionados).reduce((sum, qty) => sum + qty, 0);
 
-                updateResumoMontagem();
+                if (totalPartes < limiteSabores) {
+                    saboresSelecionados[saborId] = (saboresSelecionados[saborId] || 0) + 1;
+
+                    // Atualizar interface
+                    const saborItem = panel.querySelector(`[data-sabor-id="${saborId}"]`);
+                    const quantitySpan = saborItem.querySelector('.quantity-sabor');
+                    const removeBtn = saborItem.querySelector('[data-action="remove-sabor"]');
+
+                    quantitySpan.textContent = saboresSelecionados[saborId];
+                    removeBtn.disabled = false;
+                    saborItem.classList.add('selected');
+
+                    updateResumoMontagem();
+                } else {
+                    alert(`Você já selecionou o máximo de ${limiteSabores} parte(s) de sabores`);
+                }
             };
         });
 
-        // Eventos para complementos
-        panel.querySelectorAll('[data-action="toggle-complemento"]').forEach(btn => {
+        // Eventos para sabores (remover)
+        panel.querySelectorAll('[data-action="remove-sabor"]').forEach(btn => {
+            btn.onclick = () => {
+                const saborId = btn.dataset.id;
+
+                if (saboresSelecionados[saborId] && saboresSelecionados[saborId] > 0) {
+                    saboresSelecionados[saborId]--;
+
+                    const saborItem = panel.querySelector(`[data-sabor-id="${saborId}"]`);
+                    const quantitySpan = saborItem.querySelector('.quantity-sabor');
+
+                    quantitySpan.textContent = saboresSelecionados[saborId];
+
+                    if (saboresSelecionados[saborId] === 0) {
+                        btn.disabled = true;
+                        saborItem.classList.remove('selected');
+                        delete saboresSelecionados[saborId];
+                    }
+
+                    updateResumoMontagem();
+                }
+            };
+        });
+
+        // Eventos para complementos (adicionar)
+        panel.querySelectorAll('[data-action="add-complemento"]').forEach(btn => {
             btn.onclick = () => {
                 const complementoId = btn.dataset.id;
                 const grupoId = btn.dataset.grupo;
@@ -524,25 +595,54 @@
                 const grupo = gruposApi.find(g => g.id == grupoId);
                 const maxItens = grupo?.maxItens || 1;
 
-                const complementosDoGrupo = complementosSelecionados.filter(c => c.grupoId == grupoId);
-                const jaEstaSelecionado = complementosSelecionados.find(c => c.id == complementoId);
+                // Calcular quantos itens já foram selecionados neste grupo
+                const itensDoGrupo = Object.keys(complementosSelecionados).filter(id => {
+                    const comp = findComplementoById(id);
+                    return comp && comp.grupoId == grupoId;
+                });
 
-                if (jaEstaSelecionado) {
-                    complementosSelecionados = complementosSelecionados.filter(c => c.id != complementoId);
-                    btn.textContent = 'Selecionar';
-                    btn.parentElement.classList.remove('selected');
-                } else if (complementosDoGrupo.length < maxItens) {
-                    complementosSelecionados.push({
-                        id: complementoId,
-                        grupoId: grupoId
-                    });
-                    btn.textContent = 'Remover';
-                    btn.parentElement.classList.add('selected');
+                const totalGrupo = itensDoGrupo.reduce((sum, id) => sum + (complementosSelecionados[id] || 0), 0);
+
+                if (totalGrupo < maxItens) {
+                    complementosSelecionados[complementoId] = (complementosSelecionados[complementoId] || 0) + 1;
+
+                    // Atualizar interface
+                    const complementoItem = panel.querySelector(`[data-complemento-id="${complementoId}"]`);
+                    const quantitySpan = complementoItem.querySelector('.quantity-complemento');
+                    const removeBtn = complementoItem.querySelector('[data-action="remove-complemento"]');
+
+                    quantitySpan.textContent = complementosSelecionados[complementoId];
+                    removeBtn.disabled = false;
+                    complementoItem.classList.add('selected');
+
+                    updateResumoMontagem();
                 } else {
                     alert(`Você já selecionou o máximo de ${maxItens} item(ns) para ${grupo.nome}`);
                 }
+            };
+        });
 
-                updateResumoMontagem();
+        // Eventos para complementos (remover)
+        panel.querySelectorAll('[data-action="remove-complemento"]').forEach(btn => {
+            btn.onclick = () => {
+                const complementoId = btn.dataset.id;
+
+                if (complementosSelecionados[complementoId] && complementosSelecionados[complementoId] > 0) {
+                    complementosSelecionados[complementoId]--;
+
+                    const complementoItem = panel.querySelector(`[data-complemento-id="${complementoId}"]`);
+                    const quantitySpan = complementoItem.querySelector('.quantity-complemento');
+
+                    quantitySpan.textContent = complementosSelecionados[complementoId];
+
+                    if (complementosSelecionados[complementoId] === 0) {
+                        btn.disabled = true;
+                        complementoItem.classList.remove('selected');
+                        delete complementosSelecionados[complementoId];
+                    }
+
+                    updateResumoMontagem();
+                }
             };
         });
 
@@ -551,6 +651,19 @@
         if (finalizarBtn) {
             finalizarBtn.onclick = finalizarMontagem;
         }
+    }
+
+    // Função auxiliar para encontrar complemento por ID
+    function findComplementoById(id) {
+        for (let grupo of gruposApi) {
+            if (grupo.produtos) {
+                const complemento = grupo.produtos.find(p => p.id == id);
+                if (complemento) {
+                    return { ...complemento, grupoId: grupo.id };
+                }
+            }
+        }
+        return null;
     }
 
     function updateResumoMontagem() {
@@ -562,48 +675,57 @@
 
         const limiteSabores = getLimiteSabores(montagemProduto.nome);
 
+        // Calcular total de partes selecionadas
+        const totalPartesSabores = Object.values(saboresSelecionados).reduce((sum, qty) => sum + qty, 0);
+
         // Atualizar sabores
         let saboresHtml = '<div class="resumo-section"><strong>Sabores:</strong>';
-        if (saboresSelecionados.length === 0) {
+        if (totalPartesSabores === 0) {
             saboresHtml += ' <span class="text-muted">Nenhum sabor selecionado</span>';
         } else {
-            saboresSelecionados.forEach(saborId => {
-                let saborEncontrado = null;
-                produtosApi.forEach(tipo => {
-                    const sabor = tipo.produtos?.find(p => p.id == saborId);
-                    if (sabor) saborEncontrado = sabor;
-                });
+            Object.keys(saboresSelecionados).forEach(saborId => {
+                const quantidade = saboresSelecionados[saborId];
+                if (quantidade > 0) {
+                    let saborEncontrado = null;
+                    produtosApi.forEach(tipo => {
+                        const sabor = tipo.produtos?.find(p => p.id == saborId);
+                        if (sabor) saborEncontrado = sabor;
+                    });
 
-                if (saborEncontrado) {
-                    saboresHtml += `<div class="item-selecionado">• ${saborEncontrado.nome}</div>`;
+                    if (saborEncontrado) {
+                        const parteTexto = quantidade === 1 ? 'parte' : 'partes';
+                        saboresHtml += `<div class="item-selecionado">• ${quantidade} ${parteTexto} de ${saborEncontrado.nome}</div>`;
+                    }
                 }
             });
         }
-        saboresHtml += `</div><div class="contador-sabores">${saboresSelecionados.length}/${limiteSabores} sabores</div>`;
+        saboresHtml += `</div><div class="contador-sabores">${totalPartesSabores}/${limiteSabores} partes</div>`;
         saboresDiv.innerHTML = saboresHtml;
 
         // Atualizar complementos
         let complementosHtml = '<div class="resumo-section"><strong>Complementos:</strong>';
-        if (complementosSelecionados.length === 0) {
+        const totalComplementos = Object.values(complementosSelecionados).reduce((sum, qty) => sum + qty, 0);
+
+        if (totalComplementos === 0) {
             complementosHtml += ' <span class="text-muted">Nenhum complemento selecionado</span>';
         } else {
-            complementosSelecionados.forEach(comp => {
-                const grupo = gruposApi.find(g => g.id == comp.grupoId);
-                const complemento = grupo?.produtos?.find(p => p.id == comp.id);
-                if (complemento) {
-                    const preco = complemento.valorVenda > 0 ? `R$ ${complemento.valorVenda.toFixed(2).replace('.', ',')}` : '';
-                    complementosHtml += `<div class="item-selecionado">• ${complemento.nome} ${preco}</div>`;
+            Object.keys(complementosSelecionados).forEach(complementoId => {
+                const quantidade = complementosSelecionados[complementoId];
+                if (quantidade > 0) {
+                    const complemento = findComplementoById(complementoId);
+                    if (complemento) {
+                        const preco = complemento.valorVenda > 0 ? `R$ ${complemento.valorVenda.toFixed(2).replace('.', ',')}` : '';
+                        complementosHtml += `<div class="item-selecionado">• ${quantidade}x ${complemento.nome} ${preco}</div>`;
+                    }
                 }
             });
         }
         complementosHtml += '</div>';
         complementosDiv.innerHTML = complementosHtml;
 
-        // Habilitar/desabilitar botão
-        // Se não há sabores para escolher (ex: complementos apenas), permitir finalizar
-        // Se há sabores, deve escolher pelo menos conforme o limite
+        // Habilitar/desabilitar botão - agora precisa ter pelo menos 1 sabor
         const temSaboresDisponiveis = produtosApi.some(tipo => tipo.produtos && tipo.produtos.length > 0);
-        const podeFinalize = !temSaboresDisponiveis || saboresSelecionados.length === limiteSabores;
+        const podeFinalize = !temSaboresDisponiveis || totalPartesSabores >= 1;
 
         finalizarBtn.disabled = !podeFinalize;
         finalizarBtn.style.background = podeFinalize ? '#25D366' : '#ccc';
@@ -612,21 +734,42 @@
     function finalizarMontagem() {
         if (!montagemProduto) return;
 
-        // Criar produto personalizado
-        const saboresNomes = saboresSelecionados.map(saborId => {
-            let saborEncontrado = null;
-            produtosApi.forEach(tipo => {
-                const sabor = tipo.produtos?.find(p => p.id == saborId);
-                if (sabor) saborEncontrado = sabor;
-            });
-            return saborEncontrado?.nome || '';
-        }).filter(nome => nome);
+        // Criar arrays com os sabores e complementos selecionados
+        const saboresNomes = [];
+        Object.keys(saboresSelecionados).forEach(saborId => {
+            const quantidade = saboresSelecionados[saborId];
+            if (quantidade > 0) {
+                let saborEncontrado = null;
+                produtosApi.forEach(tipo => {
+                    const sabor = tipo.produtos?.find(p => p.id == saborId);
+                    if (sabor) saborEncontrado = sabor;
+                });
 
-        const complementosNomes = complementosSelecionados.map(comp => {
-            const grupo = gruposApi.find(g => g.id == comp.grupoId);
-            const complemento = grupo?.produtos?.find(p => p.id == comp.id);
-            return complemento?.nome || '';
-        }).filter(nome => nome);
+                if (saborEncontrado) {
+                    // Se quantidade > 1, mostrar quantas partes
+                    if (quantidade > 1) {
+                        saboresNomes.push(`${quantidade} partes de ${saborEncontrado.nome}`);
+                    } else {
+                        saboresNomes.push(saborEncontrado.nome);
+                    }
+                }
+            }
+        });
+
+        const complementosNomes = [];
+        Object.keys(complementosSelecionados).forEach(complementoId => {
+            const quantidade = complementosSelecionados[complementoId];
+            if (quantidade > 0) {
+                const complemento = findComplementoById(complementoId);
+                if (complemento) {
+                    if (quantidade > 1) {
+                        complementosNomes.push(`${quantidade}x ${complemento.nome}`);
+                    } else {
+                        complementosNomes.push(complemento.nome);
+                    }
+                }
+            }
+        });
 
         // Montar nome do produto personalizado
         let nomePersonalizado = montagemProduto.nome;
@@ -650,8 +793,8 @@
         addToCart(produtoPersonalizado);
 
         // Limpar estado da montagem
-        saboresSelecionados = [];
-        complementosSelecionados = [];
+        saboresSelecionados = {};
+        complementosSelecionados = {};
         montagemProduto = null;
         produtosApi = [];
         gruposApi = [];
@@ -660,6 +803,91 @@
         switchView('carrinho');
 
         alert('Produto personalizado adicionado ao carrinho!');
+    }
+
+    // Enviar pedido via WhatsApp - Versão Atualizada
+    function enviarPedido() {
+        const items = Object.values(carrinho);
+        if (items.length === 0) return;
+
+        const total = getCartTotal();
+
+        let mensagem = `*🛒 RESUMO DO PEDIDO*\n\n`;
+
+        items.forEach(item => {
+            // Escolher emoji apropriado
+            const emoji = escolherEmoji(item.nome);
+
+            // Linha principal do produto
+            mensagem += `*\`→\`*${emoji}*${item.quantidade}x ${item.nome}*\n\n`;
+
+            // Se tem personalização, mostrar sabores e complementos formatados
+            if (item.personalizado) {
+                // Sabores
+                if (item.sabores && item.sabores.length > 0) {
+                    mensagem += `${emoji}*Sabores:*\n\n`;
+                    item.sabores.forEach(sabor => {
+                        mensagem += `*\`→\`**${sabor}*\n`;
+                    });
+                    mensagem += '\n';
+                }
+
+                // Complementos
+                if (item.complementos && item.complementos.length > 0) {
+                    const tipoComplemento = detectarTipoComplemento(item.complementos);
+                    mensagem += `🥘 *${tipoComplemento}:*\n`;
+
+                    item.complementos.forEach(complemento => {
+                        mensagem += `*\`→\`**${complemento}*\n`;
+                    });
+                    mensagem += '\n';
+                }
+            }
+
+            // Preço do item (limpar formatação se necessário)
+            let precoLimpo = item.preco;
+            if (typeof precoLimpo === 'string') {
+                precoLimpo = precoLimpo.replace(/[^\d,\.]/g, '');
+                // Se já tem formatação brasileira, manter
+                if (!precoLimpo.includes('R$')) {
+                    precoLimpo = `R$ ${precoLimpo}`;
+                }
+            }
+            mensagem += `${precoLimpo}\n\n`;
+        });
+
+        mensagem += `\`💰 Total: *R$ ${total.toFixed(2).replace('.', ',')}*\`\n\nObrigado! 😊`;
+
+        // Copiar mensagem para área de transferência
+        navigator.clipboard.writeText(mensagem).then(() => {
+            // Encontrar campo de mensagem do WhatsApp
+            const messageBox = document.querySelector('[contenteditable="true"][data-tab="10"]') ||
+                document.querySelector('[contenteditable="true"]') ||
+                document.querySelector('div[title="Digite uma mensagem"]');
+
+            if (messageBox) {
+                messageBox.focus();
+                setTimeout(() => {
+                    const pasteEvent = new KeyboardEvent('keydown', {
+                        key: 'v',
+                        code: 'KeyV',
+                        ctrlKey: true,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    messageBox.dispatchEvent(pasteEvent);
+                    clearCart();
+                    togglePanel(); // Fechar painel após enviar
+                    alert('Pedido colado no WhatsApp e carrinho limpo! Pressione Enter para enviar.');
+                }, 100);
+            } else {
+                clearCart();
+                alert('Pedido copiado para área de transferência e carrinho limpo! Cole manualmente no WhatsApp.');
+            }
+        }).catch(() => {
+            clearCart();
+            alert('Erro ao copiar. Copie esta mensagem:\n\n' + mensagem);
+        });
     }
 
     // Função para extrair produtos do HTML
@@ -914,62 +1142,6 @@
         // Adicionar produtos
         const addProductsBtn = panel.querySelector('[data-action="add-products"]');
         if (addProductsBtn) addProductsBtn.onclick = requestUrl;
-    }
-
-    // Enviar pedido via WhatsApp
-    function enviarPedido() {
-        const items = Object.values(carrinho);
-        if (items.length === 0) return;
-
-        const total = getCartTotal();
-
-        let mensagem = `*🛒 RESUMO DO PEDIDO*\n\n`;
-
-        items.forEach(item => {
-            mensagem += `• ${item.quantidade}x ${item.nome}`;
-            if (item.personalizado) {
-                if (item.sabores && item.sabores.length > 0) {
-                    mensagem += `\n  Sabores: ${item.sabores.join(', ')}`;
-                }
-                if (item.complementos && item.complementos.length > 0) {
-                    mensagem += `\n  Complementos: ${item.complementos.join(', ')}`;
-                }
-            }
-            mensagem += `\n  ${item.preco}\n\n`;
-        });
-
-        mensagem += `*💰 Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\nObrigado! 😊`;
-
-        // Copiar mensagem para área de transferência
-        navigator.clipboard.writeText(mensagem).then(() => {
-            // Encontrar campo de mensagem do WhatsApp
-            const messageBox = document.querySelector('[contenteditable="true"][data-tab="10"]') ||
-                document.querySelector('[contenteditable="true"]') ||
-                document.querySelector('div[title="Digite uma mensagem"]');
-
-            if (messageBox) {
-                messageBox.focus();
-                setTimeout(() => {
-                    const pasteEvent = new KeyboardEvent('keydown', {
-                        key: 'v',
-                        code: 'KeyV',
-                        ctrlKey: true,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    messageBox.dispatchEvent(pasteEvent);
-                    clearCart();
-                    togglePanel(); // Fechar painel após enviar
-                    alert('Pedido colado no WhatsApp e carrinho limpo! Pressione Enter para enviar.');
-                }, 100);
-            } else {
-                clearCart();
-                alert('Pedido copiado para área de transferência e carrinho limpo! Cole manualmente no WhatsApp.');
-            }
-        }).catch(() => {
-            clearCart();
-            alert('Erro ao copiar. Copie esta mensagem:\n\n' + mensagem);
-        });
     }
 
     // Verificar se estamos no WhatsApp
