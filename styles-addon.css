@@ -1,0 +1,47 @@
+/* Adicionar ao final do styles.css existente */
+
+.sabor-desc {
+    font-size: 10px;
+    color: #999;
+    display: block;
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.sabor-item.selected .sabor-desc {
+    color: #ddd;
+}
+
+.produto-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.add-btn, .customize-btn {
+    flex: 1;
+    min-width: 60px;
+}
+
+.sabor-info, .complemento-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Melhorar responsividade dos cards de produto */
+@media (max-width: 400px) {
+    .faminto-panel {
+        width: calc(100vw - 30px);
+        right: 15px;
+    }
+    
+    .produto-actions {
+        flex-direction: column;
+    }
+    
+    .add-btn, .customize-btn {
+        width: 100%;
+    }
+}

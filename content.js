@@ -6,7 +6,7 @@
     let currentView = 'produtos';
     let montagemProduto = null;
     let produtosApi = [];
-    let tipoProdutosApi = [];
+    let gruposApi = [];
     let saboresSelecionados = [];
     let complementosSelecionados = [];
 
@@ -74,13 +74,22 @@
         return nomeMin.includes('sabor') ||
             nomeMin.includes('pizza') ||
             nomeMin.includes('monte') ||
-            nomeMin.includes('personaliz');
+            nomeMin.includes('personaliz') ||
+            nomeMin.includes('combo') ||
+            nomeMin.includes('fritas');
     }
 
     // Extrair limite de sabores do nome do produto
     function getLimiteSabores(nome) {
         const match = nome.match(/(\d+)\s*sabores?/i);
         return match ? parseInt(match[1]) : 1;
+    }
+
+    // Extrair ID da categoria do produto para buscar complementos
+    function extractCategoryId(nome, allProducts) {
+        // Tentar encontrar o produto na lista e pegar seu ID de categoria
+        const produto = allProducts.find(p => p.nome === nome);
+        return produto?.id || null;
     }
 
     function addToCart(produto) {
@@ -245,7 +254,7 @@
                     <ul>
                         <li>Clique em "Carregar Cardápio" e cole a URL do restaurante</li>
                         <li>Navegue pelos produtos e adicione ao carrinho</li>
-                        <li>Para pizzas, use o botão "Personalizar" para montar</li>
+                        <li>Para pizzas, combos e fritas, use "Personalizar"</li>
                         <li>Finalize o pedido enviando para o WhatsApp</li>
                     </ul>
                 </div>
@@ -280,15 +289,16 @@
     }
 
     // Carregar dados da API para montagem via background script
-    async function loadApiData(url) {
+    async function loadApiData(productId, baseUrl) {
         try {
-            const match = url.match(/\/app\/(\d+)\/(\d+)/);
-
+            // Extrair IDs da URL base
+            const match = baseUrl.match(/\/app\/(\d+)\/(\d+)/);
             if (!match) return false;
 
             const [, appId, restaurantId] = match;
-            const baseUrl = url.split('/app/')[0];
-            const apiUrl = `${baseUrl}/api/produto/carregarProdutosOrganizados/${appId}/${restaurantId}/9433?delivery=true`;
+            const apiUrl = `${baseUrl.split('/app/')[0]}/api/produto/carregarProdutosOrganizados/${appId}/${restaurantId}/${productId}?delivery=true`;
+
+            console.log('Carregando API para produto:', productId, 'URL:', apiUrl);
 
             return new Promise((resolve) => {
                 chrome.runtime.sendMessage(
@@ -297,8 +307,37 @@
                         if (response && response.success) {
                             try {
                                 const data = JSON.parse(response.data);
-                                produtosApi = data.tipoProdutos || [];
-                                tipoProdutosApi = data.grupos || [];
+                                console.log('Dados da API recebidos:', data);
+
+                                // Processar tipoProdutos (sabores)
+                                produtosApi = [];
+                                if (data.tipoProdutos && Array.isArray(data.tipoProdutos)) {
+                                    data.tipoProdutos.forEach(tipo => {
+                                        if (tipo.listaProdutos && Array.isArray(tipo.listaProdutos)) {
+                                            produtosApi.push({
+                                                id: tipo.id,
+                                                nome: tipo.titulo,
+                                                produtos: tipo.listaProdutos.filter(p => p.ativo === 1)
+                                            });
+                                        }
+                                    });
+                                }
+
+                                // Processar grupos (complementos)
+                                gruposApi = [];
+                                if (data.grupos && Array.isArray(data.grupos)) {
+                                    gruposApi = data.grupos.filter(g => g.ativo === true).map(grupo => ({
+                                        id: grupo.id,
+                                        nome: grupo.nome,
+                                        maxItens: grupo.maxItens || 1,
+                                        obrigatorio: grupo.tipo === 1, // assumindo que tipo 1 = obrigatório
+                                        produtos: grupo.itens || []
+                                    }));
+                                }
+
+                                console.log('Sabores processados:', produtosApi);
+                                console.log('Grupos processados:', gruposApi);
+
                                 resolve(true);
                             } catch (error) {
                                 console.error('Erro ao parsear JSON da API:', error);
@@ -349,58 +388,69 @@
             </div>
         `;
 
-        // Sabores disponíveis
-        const saboresSalgadas = produtosApi.find(tipo =>
-            tipo.nome?.toLowerCase().includes('salgada') ||
-            tipo.nome?.toLowerCase().includes('sabor')
-        );
+        // Exibir sabores disponíveis
+        if (produtosApi.length > 0) {
+            produtosApi.forEach(tipoSabor => {
+                if (tipoSabor.produtos && tipoSabor.produtos.length > 0) {
+                    html += `
+                        <div class="sabores-section">
+                            <h4>🧀 ${tipoSabor.nome}</h4>
+                            <div class="sabores-grid">
+                    `;
 
-        if (saboresSalgadas && saboresSalgadas.produtos) {
+                    tipoSabor.produtos.forEach(sabor => {
+                        const preco = sabor.valorVenda > 0 ? `R$ ${sabor.valorVenda.toFixed(2).replace('.', ',')}` : '';
+                        html += `
+                            <div class="sabor-item" data-sabor-id="${sabor.id}" data-tipo="${tipoSabor.id}">
+                                <div class="sabor-info">
+                                    <span class="sabor-nome">${sabor.nome}</span>
+                                    ${sabor.textocomposicao ? `<span class="sabor-desc">${sabor.textocomposicao}</span>` : ''}
+                                    ${preco ? `<span class="sabor-preco">${preco}</span>` : ''}
+                                </div>
+                                <button class="sabor-btn" data-action="toggle-sabor" data-id="${sabor.id}">
+                                    Selecionar
+                                </button>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div></div>';
+                }
+            });
+        } else {
             html += `
                 <div class="sabores-section">
-                    <h4>🧀 Sabores Disponíveis</h4>
-                    <div class="sabores-grid">
+                    <h4>🧀 Sabores</h4>
+                    <p style="color: #666; text-align: center; padding: 20px;">
+                        Nenhum sabor disponível para personalização
+                    </p>
+                </div>
             `;
-
-            saboresSalgadas.produtos.forEach(sabor => {
-                html += `
-                    <div class="sabor-item" data-sabor-id="${sabor.id}">
-                        <div class="sabor-info">
-                            <span class="sabor-nome">${sabor.nome}</span>
-                            <span class="sabor-preco">${sabor.preco || ''}</span>
-                        </div>
-                        <button class="sabor-btn" data-action="toggle-sabor" data-id="${sabor.id}">
-                            Selecionar
-                        </button>
-                    </div>
-                `;
-            });
-
-            html += '</div></div>';
         }
 
-        // Complementos
-        if (tipoProdutosApi.length > 0) {
-            html += '<div class="complementos-section"><h4>🍔 Complementos</h4>';
+        // Exibir complementos disponíveis
+        if (gruposApi.length > 0) {
+            html += '<div class="complementos-section"><h4>🍔 Complementos Extras</h4>';
 
-            tipoProdutosApi.forEach(grupo => {
-                if (grupo.nome && grupo.produtos) {
+            gruposApi.forEach(grupo => {
+                if (grupo.produtos && grupo.produtos.length > 0) {
                     html += `
                         <div class="grupo-complementos">
                             <h5>${grupo.nome}</h5>
                             <p class="grupo-info">
                                 ${grupo.obrigatorio ? 'Obrigatório' : 'Opcional'} 
-                                ${grupo.maxItens ? `(máx: ${grupo.maxItens})` : ''}
+                                (máx: ${grupo.maxItens})
                             </p>
                             <div class="complementos-list">
                     `;
 
                     grupo.produtos.forEach(complemento => {
+                        const preco = complemento.valorVenda > 0 ? `R$ ${complemento.valorVenda.toFixed(2).replace('.', ',')}` : '';
                         html += `
                             <div class="complemento-item" data-complemento-id="${complemento.id}" data-grupo="${grupo.id}">
                                 <div class="complemento-info">
                                     <span class="complemento-nome">${complemento.nome}</span>
-                                    <span class="complemento-preco">${complemento.preco || ''}</span>
+                                    ${preco ? `<span class="complemento-preco">${preco}</span>` : ''}
                                 </div>
                                 <button class="complemento-btn" data-action="toggle-complemento" data-id="${complemento.id}" data-grupo="${grupo.id}">
                                     Selecionar
@@ -424,7 +474,7 @@
                     <div id="sabores-selecionados"></div>
                     <div id="complementos-selecionados"></div>
                 </div>
-                <button id="finalizar-montagem" class="finalizar-btn" disabled data-action="finalizar-montagem">
+                <button id="finalizar-montagem" class="finalizar-btn" ${produtosApi.length > 0 ? 'disabled' : ''} data-action="finalizar-montagem">
                     Adicionar ao Carrinho
                 </button>
             </div>
@@ -457,6 +507,8 @@
                     saboresSelecionados.push(saborId);
                     btn.textContent = 'Remover';
                     btn.parentElement.classList.add('selected');
+                } else {
+                    alert(`Você já selecionou o máximo de ${limiteSabores} sabor(es)`);
                 }
 
                 updateResumoMontagem();
@@ -469,8 +521,8 @@
                 const complementoId = btn.dataset.id;
                 const grupoId = btn.dataset.grupo;
 
-                const grupo = tipoProdutosApi.find(g => g.id == grupoId);
-                const maxItens = grupo?.maxItens || 999;
+                const grupo = gruposApi.find(g => g.id == grupoId);
+                const maxItens = grupo?.maxItens || 1;
 
                 const complementosDoGrupo = complementosSelecionados.filter(c => c.grupoId == grupoId);
                 const jaEstaSelecionado = complementosSelecionados.find(c => c.id == complementoId);
@@ -486,6 +538,8 @@
                     });
                     btn.textContent = 'Remover';
                     btn.parentElement.classList.add('selected');
+                } else {
+                    alert(`Você já selecionou o máximo de ${maxItens} item(ns) para ${grupo.nome}`);
                 }
 
                 updateResumoMontagem();
@@ -514,11 +568,14 @@
             saboresHtml += ' <span class="text-muted">Nenhum sabor selecionado</span>';
         } else {
             saboresSelecionados.forEach(saborId => {
-                const sabor = produtosApi
-                    .find(tipo => tipo.produtos)
-                    ?.produtos.find(p => p.id == saborId);
-                if (sabor) {
-                    saboresHtml += `<div class="item-selecionado">• ${sabor.nome}</div>`;
+                let saborEncontrado = null;
+                produtosApi.forEach(tipo => {
+                    const sabor = tipo.produtos?.find(p => p.id == saborId);
+                    if (sabor) saborEncontrado = sabor;
+                });
+
+                if (saborEncontrado) {
+                    saboresHtml += `<div class="item-selecionado">• ${saborEncontrado.nome}</div>`;
                 }
             });
         }
@@ -531,10 +588,11 @@
             complementosHtml += ' <span class="text-muted">Nenhum complemento selecionado</span>';
         } else {
             complementosSelecionados.forEach(comp => {
-                const grupo = tipoProdutosApi.find(g => g.id == comp.grupoId);
-                const complemento = grupo?.produtos.find(p => p.id == comp.id);
+                const grupo = gruposApi.find(g => g.id == comp.grupoId);
+                const complemento = grupo?.produtos?.find(p => p.id == comp.id);
                 if (complemento) {
-                    complementosHtml += `<div class="item-selecionado">• ${complemento.nome} ${complemento.preco || ''}</div>`;
+                    const preco = complemento.valorVenda > 0 ? `R$ ${complemento.valorVenda.toFixed(2).replace('.', ',')}` : '';
+                    complementosHtml += `<div class="item-selecionado">• ${complemento.nome} ${preco}</div>`;
                 }
             });
         }
@@ -542,7 +600,11 @@
         complementosDiv.innerHTML = complementosHtml;
 
         // Habilitar/desabilitar botão
-        const podeFinalize = saboresSelecionados.length === limiteSabores;
+        // Se não há sabores para escolher (ex: complementos apenas), permitir finalizar
+        // Se há sabores, deve escolher pelo menos conforme o limite
+        const temSaboresDisponiveis = produtosApi.some(tipo => tipo.produtos && tipo.produtos.length > 0);
+        const podeFinalize = !temSaboresDisponiveis || saboresSelecionados.length === limiteSabores;
+
         finalizarBtn.disabled = !podeFinalize;
         finalizarBtn.style.background = podeFinalize ? '#25D366' : '#ccc';
     }
@@ -552,20 +614,31 @@
 
         // Criar produto personalizado
         const saboresNomes = saboresSelecionados.map(saborId => {
-            const sabor = produtosApi
-                .find(tipo => tipo.produtos)
-                ?.produtos.find(p => p.id == saborId);
-            return sabor?.nome || '';
+            let saborEncontrado = null;
+            produtosApi.forEach(tipo => {
+                const sabor = tipo.produtos?.find(p => p.id == saborId);
+                if (sabor) saborEncontrado = sabor;
+            });
+            return saborEncontrado?.nome || '';
         }).filter(nome => nome);
 
         const complementosNomes = complementosSelecionados.map(comp => {
-            const grupo = tipoProdutosApi.find(g => g.id == comp.grupoId);
-            const complemento = grupo?.produtos.find(p => p.id == comp.id);
+            const grupo = gruposApi.find(g => g.id == comp.grupoId);
+            const complemento = grupo?.produtos?.find(p => p.id == comp.id);
             return complemento?.nome || '';
         }).filter(nome => nome);
 
+        // Montar nome do produto personalizado
+        let nomePersonalizado = montagemProduto.nome;
+        if (saboresNomes.length > 0) {
+            nomePersonalizado += ` - ${saboresNomes.join(', ')}`;
+        }
+        if (complementosNomes.length > 0) {
+            nomePersonalizado += ` + ${complementosNomes.join(', ')}`;
+        }
+
         const produtoPersonalizado = {
-            nome: `${montagemProduto.nome} - ${saboresNomes.join(', ')}`,
+            nome: nomePersonalizado,
             preco: montagemProduto.preco,
             img: montagemProduto.img,
             sabores: saboresNomes,
@@ -580,6 +653,8 @@
         saboresSelecionados = [];
         complementosSelecionados = [];
         montagemProduto = null;
+        produtosApi = [];
+        gruposApi = [];
 
         // Voltar para carrinho
         switchView('carrinho');
@@ -597,7 +672,19 @@
             const nome = el.querySelector('.nome')?.textContent.trim();
             const img = el.querySelector('img')?.src;
             const preco = el.querySelector('.post-seconds')?.textContent.trim();
-            if (nome) produtos.push({ nome, img, preco });
+
+            // Tentar extrair ID do produto do atributo id do elemento
+            const elementId = el.id;
+            const produtoId = elementId.replace(/id_(categoria|produto)_/, '');
+
+            if (nome) {
+                produtos.push({
+                    nome,
+                    img,
+                    preco,
+                    id: produtoId // Adicionar ID para usar na API
+                });
+            }
         });
 
         return produtos;
@@ -666,7 +753,7 @@
                                     + Carrinho
                                 </button>
                                 ${isPersonalizavel ?
-                        `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}">
+                        `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}" data-id="${produto.id || ''}">
                                         🔧 Personalizar
                                     </button>` :
                         ''
@@ -709,22 +796,31 @@
                 const produto = {
                     nome: btn.dataset.nome,
                     preco: btn.dataset.preco,
-                    img: btn.dataset.img
+                    img: btn.dataset.img,
+                    id: btn.dataset.id
                 };
 
                 const produtoUrl = btn.dataset.url;
+                const produtoId = btn.dataset.id;
 
-                // Carregar dados da API se necessário
-                if (produtosApi.length === 0 && produtoUrl) {
-                    // Mostrar loading
-                    panel.innerHTML = createHeader() + '<div class="content"><div style="text-align: center; padding: 40px;"><div style="font-size: 24px;">⏳</div><p>Carregando dados de personalização...</p></div></div>';
-                    setupHeaderEvents();
+                // Mostrar loading
+                panel.innerHTML = createHeader() + '<div class="content"><div style="text-align: center; padding: 40px;"><div style="font-size: 24px;">⏳</div><p>Carregando opções de personalização...</p></div></div>';
+                setupHeaderEvents();
 
-                    const loaded = await loadApiData(produtoUrl);
+                // Carregar dados da API
+                if (produtoId && produtoUrl) {
+                    const loaded = await loadApiData(produtoId, produtoUrl);
                     if (!loaded) {
-                        alert('Erro ao carregar dados para personalização. A funcionalidade pode estar limitada.');
-                        // Continuar mesmo assim, mas sem dados da API
+                        alert('Erro ao carregar dados para personalização. Adicionando produto simples ao carrinho.');
+                        addToCart(produto);
+                        switchView('carrinho');
+                        return;
                     }
+                } else {
+                    alert('ID do produto não encontrado. Adicionando produto simples ao carrinho.');
+                    addToCart(produto);
+                    switchView('carrinho');
+                    return;
                 }
 
                 montagemProduto = produto;
@@ -752,7 +848,7 @@
                         <img class="carrinho-img" data-src="${item.img}" src="${placeholderUrl}" alt="${item.nome}">
                         <div class="carrinho-info">
                             <div class="carrinho-nome">${item.nome}</div>
-                            ${item.personalizado && item.sabores ?
+                            ${item.personalizado && item.sabores && item.sabores.length > 0 ?
                         `<div class="carrinho-sabores">Sabores: ${item.sabores.join(', ')}</div>` :
                         ''
                     }
