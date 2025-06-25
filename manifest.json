@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Faminto WhatsApp com Imagens e Carrinho",
-  "version": "4.1",
+  "version": "4.2",
   "description": "Mostra produtos e entregas da Faminto no WhatsApp com imagens e carrinho",
   "permissions": [
     "activeTab",

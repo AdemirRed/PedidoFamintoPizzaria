@@ -1,0 +1,104 @@
+{
+    "enderecoid": 0,
+    "vlrentrega": 0,
+    "retira": true,
+    "status": 0,
+    "obs": "",
+    "mesa": "",
+    "agendamentoid": 0,
+    "dataAgendamento": null,
+    "nomedocupom": "",
+    "vlrcupom": 0,
+    "troco": 0,
+    "itens": [
+        {
+            "categoriaId": 42, "← Aqui voce coloca o ID da categoria do produto"
+            "qtd": 1,
+            "nomecat": "Guaraná 350ml",
+            "valorTotal": 0.2,"<-- Aqui voce coloca o valor total do produto que é a somatoria de tudo com o frente e os adicionais",
+            "obs": null,
+            "pedidoitemadicionais": [],
+            "composicao": [
+                {
+                    "produtoid": "1990",<-- Aqui voce coloca o ID do produto
+                    "nomeprod": "Guaraná 350ml",
+                    "vlrvenda": 3001,
+                    "idInput": null,
+                    "qtdInput": 0,
+                    "tempofab": 0
+                }
+            ],
+            "senhaGarcom": "",
+            "montavel": false
+        }
+    ],
+    "endereco": { 
+    "bairroid": "129","Carega a resposta do bairro do endereco do usuario"
+        "rua": "AAA", "<-- Aqui voce coloca a rua do endereco do usuario"
+        "nrocasa": "9", "<-- Aqui voce coloca o numero da casa do endereco do usuario"
+        "bairro": null, "<-- o bairro não pode ser nulo, deve ser carregado com a rota acima"
+        "usuario": {
+            "enderecos": [ "<-- Aqui voce coloca os endereços do usuario que podem ser carregados com a rota
+                                     https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/{iddaloja}/{CNPJ}"
+                {
+                    "id": 660880,
+                    "bairroid": "129", "<-- Aqui voce coloca o ID do bairro do endereco do usuario"
+                    "nrocasa": "9", "<-- Aqui voce coloca o numero da casa do endereco do usuario"
+                    "rua": "AAA", "<-- Aqui voce coloca a rua do endereco do usuario"
+                    "tipoendereco": "0", 
+                    "usuarioId": 364954, "<-- Aqui voce coloca o ID do usuario"
+                    "complemento": "", "<-- Aqui voce coloca o complemento do endereco do usuario se ter"
+                    "bairro": {
+                        "id": 129, "Aqui é os dados do id do bairro do endereco do usuario"
+                        "nome": "Agricola",
+                        "cidadeId": 7,
+                        "empresaId": 7,
+                        "valorEntrega": 10, "<-- valor da entrega que deve ser somado no valor total do pedido"
+                        "bloqueado": false,
+                        "cidade": { 
+                            "id": 7,
+                            "empresaId": 7,
+                            "nome": "Santa Rosa",
+                            "uf": "RS",
+                            "valorEntrega": 10,
+                            "entregaKm": false,
+                            "ativo": true
+                        },
+                        "minutoInicia": 0,
+                        "minutoFinal": 1439,
+                        "tmpEntrega": 0
+                    }
+                }
+            ],
+            "id": 364954, "<-- Dados do usuario precisa ser o mesmo do usuario logado"
+            "celular": "51999999999",  "<-- Aqui voce coloca o celular do usuario"
+            "cpf": "08718535070", "<-- Aqui voce coloca o CPF do usuario" 
+            "empresaId": 7, 
+            "nome": "Teste", "<-- Aqui voce coloca o nome do usuario"
+            "sexo": 0, 
+            "empresa": null,
+            "cartoesUsuario": [],
+            "CartoesUsuario": []
+        },
+        "textoendereco": null,
+        "complemento": "",
+        "meuspedidos": null
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
+    "descontouFidelidade": false,
+    "pagamentos": [
+        {
+            "formapgtoid": "17",
+            "troco": 0,
+            "codigopix": null,
+            "CartaoId": null,
+            "Cartao": null,
+            "DataCartao": null,
+            "NomeCartao": null,
+            "cvv": null,
+            "autorizado": null
+        }
+    ],
+    "entregaGratis": false,
+    "visitorId": "e8e42c4f8c6760584a26e05dba7a10f8e2300e24"
+}

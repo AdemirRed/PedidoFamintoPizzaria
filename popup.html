@@ -163,6 +163,33 @@
             outline: none;
             border-color: #25D366;
         }
+        
+        /* Novo estilo para seção de envio ao painel */
+        .panel-section {
+            background: linear-gradient(to right, #ff6b35, #ff8c52);
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .panel-section h3 {
+            margin: 0 0 10px 0;
+            color: white;
+            font-size: 14px;
+        }
+        
+        .panel-section .button-primary {
+            background: white;
+            color: #ff6b35;
+            font-weight: bold;
+        }
+        
+        .panel-section .button-primary:hover {
+            background: #f0f0f0;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
@@ -184,6 +211,13 @@
             <span class="config-label">Total:</span>
             <span id="cart-total" class="config-value">R$ 0,00</span>
         </div>
+    </div>
+
+    <div class="panel-section">
+        <h3>🍽️ Envio ao Painel de Pedidos</h3>
+        <button id="config-cliente" class="button button-primary">
+            ⚙️ Configurar Dados do Cliente
+        </button>
     </div>
 
     <div class="section">
@@ -211,7 +245,7 @@
         <h3>ℹ️ Informações</h3>
         <div class="config-item">
             <span class="config-label">Versão:</span>
-            <span class="config-value">4.1</span>
+            <span class="config-value">4.2</span>
         </div>
         <div class="config-item">
             <span class="config-label">Página Atual:</span>

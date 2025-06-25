@@ -10,6 +10,9 @@
     let saboresSelecionados = {}; // Mudança: agora é objeto com quantidades
     let complementosSelecionados = {}; // Mudança: agora é objeto com quantidades
 
+    let horariosAtendimento = [];
+    let statusAtendimento = false;
+
     // Carregar imagem com fallback
     function loadImage(imgElement, url) {
         if (!url) {
@@ -34,23 +37,109 @@
         };
     }
 
-    // Criar header
+    // Verificar se o atendimento está ativo
+    function verificarAtendimentoAtivo() {
+        if (!horariosAtendimento || horariosAtendimento.length === 0) {
+            return false;
+        }
+
+        const agora = new Date();
+        const diaSemana = agora.getDay(); // 0 = domingo, 1 = segunda, etc.
+        const minutosAtual = agora.getHours() * 60 + agora.getMinutes();
+
+        const horarioHoje = horariosAtendimento.find(h => h.diaSemana === diaSemana);
+        
+        if (!horarioHoje) {
+            return false;
+        }
+
+        return minutosAtual >= horarioHoje.minutoAbre && minutosAtual <= horarioHoje.minutoFecha;
+    }
+
+    // Carregar horários de atendimento
+    async function carregarHorariosAtendimento() {
+        chrome.storage.local.get(['faminto_empresa_id'], function(result) {
+            const empresaId = result.faminto_empresa_id || '7';
+            const apiUrl = `https://pedidos.faminto.app/api/horariosteleretirada/${empresaId}`;
+
+            chrome.runtime.sendMessage(
+                { action: 'fetchApi', url: apiUrl },
+                (response) => {
+                    if (response && response.success) {
+                        try {
+                            horariosAtendimento = JSON.parse(response.data);
+                            statusAtendimento = verificarAtendimentoAtivo();
+                            console.log('Horários carregados:', horariosAtendimento);
+                            console.log('Status atendimento:', statusAtendimento);
+                            
+                            // Atualizar header se o painel estiver aberto
+                            if (panel && panel.style.display !== 'none') {
+                                updateHeaderStatus();
+                            }
+                        } catch (error) {
+                            console.error('Erro ao processar horários de atendimento:', error);
+                        }
+                    } else {
+                        console.error('Erro ao carregar horários:', response?.error);
+                    }
+                }
+            );
+        });
+    }
+
+    // Atualizar status no header
+    function updateHeaderStatus() {
+        const headerElement = panel.querySelector('.faminto-header');
+        if (!headerElement) return;
+
+        let statusIndicator = headerElement.querySelector('.status-indicator');
+        if (!statusIndicator) {
+            statusIndicator = document.createElement('div');
+            statusIndicator.className = 'status-indicator';
+            headerElement.appendChild(statusIndicator);
+        }
+
+        const agora = new Date();
+        const horaAtual = agora.getHours().toString().padStart(2, '0') + ':' + agora.getMinutes().toString().padStart(2, '0');
+        
+        if (statusAtendimento) {
+            statusIndicator.innerHTML = `
+                <span class="status-dot active"></span>
+                <span class="status-text">Aberto - ${horaAtual}</span>
+            `;
+            statusIndicator.className = 'status-indicator active';
+        } else {
+            const diaSemana = agora.getDay();
+            const horarioHoje = horariosAtendimento.find(h => h.diaSemana === diaSemana);
+            const proximaAbertura = horarioHoje ? horarioHoje.horaAbre : 'N/A';
+            
+            statusIndicator.innerHTML = `
+                <span class="status-dot inactive"></span>
+                <span class="status-text">Fechado - Abre às ${proximaAbertura}</span>
+            `;
+            statusIndicator.className = 'status-indicator inactive';
+        }
+    }
+
+    // Criar header atualizado com status
     function createHeader() {
         return `
             <div class="faminto-header">
-                <div class="faminto-nav">
-                    <button class="nav-button ${currentView === 'produtos' ? 'active' : ''}" data-view="produtos">
-                        🍕 Produtos
-                    </button>
-                    <button class="nav-button ${currentView === 'carrinho' ? 'active' : ''}" data-view="carrinho">
-                        🛒 Carrinho (${getCartItemCount()})
-                    </button>
-                    ${currentView === 'montagem' ?
-                '<button class="nav-button active" data-view="montagem">🔧 Montagem</button>' :
-                ''
-            }
+                <div class="header-top">
+                    <div class="faminto-nav">
+                        <button class="nav-button ${currentView === 'produtos' ? 'active' : ''}" data-view="produtos">
+                            🍕 Produtos
+                        </button>
+                        <button class="nav-button ${currentView === 'carrinho' ? 'active' : ''}" data-view="carrinho">
+                            🛒 Carrinho (${getCartItemCount()})
+                        </button>
+                        ${currentView === 'montagem' ?
+                    '<button class="nav-button active" data-view="montagem">🔧 Montagem</button>' :
+                    ''
+                }
+                    </div>
+                    <button class="close-btn">×</button>
                 </div>
-                <button class="close-btn">×</button>
             </div>
         `;
     }
@@ -66,6 +155,9 @@
         if (carrinhoBtn) carrinhoBtn.onclick = () => switchView('carrinho');
         if (montagemBtn) montagemBtn.onclick = () => switchView('montagem');
         if (closeBtn) closeBtn.onclick = togglePanel;
+
+        // Atualizar status após configurar eventos
+        updateHeaderStatus();
     }
 
     // Detectar se produto permite montagem personalizada
@@ -1099,9 +1191,14 @@
             html += `
                 <div class="carrinho-total">
                     <div class="total-valor">Total: R$ ${total.toFixed(2).replace('.', ',')}</div>
-                    <button class="enviar-btn" data-action="send-order" ${items.length === 0 ? 'disabled' : ''}>
-                        Enviar Pedido via WhatsApp
-                    </button>
+                    <div class="carrinho-acoes">
+                        <button class="enviar-btn" data-action="send-order" ${items.length === 0 ? 'disabled' : ''}>
+                            <i class="ico-whatsapp"></i> Enviar via WhatsApp
+                        </button>
+                        <button class="enviar-painel-btn" data-action="send-to-panel" ${items.length === 0 ? 'disabled' : ''}>
+                            <i class="ico-panel"></i> Enviar ao Painel
+                        </button>
+                    </div>
                 </div>
             `;
         }
@@ -1117,6 +1214,7 @@
         });
     }
 
+    // Modificar a função setupCartEvents para adicionar eventos dos novos botões
     function setupCartEvents() {
         // Controles de quantidade
         panel.querySelectorAll('.qty-btn').forEach(btn => {
@@ -1133,20 +1231,199 @@
             };
         });
 
-        // Enviar pedido
+        // Enviar pedido via WhatsApp
         const enviarBtn = panel.querySelector('[data-action="send-order"]');
         if (enviarBtn && !enviarBtn.disabled) {
             enviarBtn.onclick = enviarPedido;
         }
+
+        // Novo botão: Enviar ao Painel
+        const enviarPainelBtn = panel.querySelector('[data-action="send-to-panel"]');
+        if (enviarPainelBtn && !enviarPainelBtn.disabled) {
+            enviarPainelBtn.onclick = enviarPedidoPainel;
+        }
+
+       
 
         // Adicionar produtos
         const addProductsBtn = panel.querySelector('[data-action="add-products"]');
         if (addProductsBtn) addProductsBtn.onclick = requestUrl;
     }
 
-    // Verificar se estamos no WhatsApp
-    function checkWhatsAppPage() {
-        return window.location.href.includes('web.whatsapp.com');
+    // Nova função simplificada para enviar pedido ao Painel
+    async function enviarPedidoPainel() {
+        try {
+            // Verificar se o carrinho está vazio
+            if (Object.keys(carrinho).length === 0) {
+                alert('O carrinho está vazio. Adicione produtos antes de enviar.');
+                return;
+            }
+
+            // Verificar se o atendimento está ativo
+            if (!statusAtendimento) {
+                const diaSemana = new Date().getDay();
+                const horarioHoje = horariosAtendimento.find(h => h.diaSemana === diaSemana);
+                const proximaAbertura = horarioHoje ? horarioHoje.horaAbre : 'Consulte os horários';
+                
+                alert(`🕐 Atendimento fechado no momento.\n\nPróxima abertura: ${proximaAbertura}\n\nTente novamente durante o horário de funcionamento.`);
+                return;
+            }
+
+            // Solicitar dados do cliente
+            const telefone = prompt('Digite o número de telefone do cliente (apenas números):');
+            if (!telefone || !/^\d+$/.test(telefone)) {
+                alert('Número de telefone inválido. Digite apenas números.');
+                return;
+            }
+
+            // Buscar dados do cliente via API
+            chrome.storage.local.get(['faminto_empresa_id'], async function (result) {
+                const empresaId = result.faminto_empresa_id || '7';
+                const apiUrl = `https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/${empresaId}/${telefone}`;
+
+                chrome.runtime.sendMessage(
+                    { action: 'fetchApi', url: apiUrl },
+                    (response) => {
+                        if (response && response.success) {
+                            try {
+                                const clienteData = JSON.parse(response.data);
+                                if (!clienteData || !clienteData.id) {
+                                    alert('Cliente não encontrado para o número fornecido.');
+                                    return;
+                                }
+
+                                // Processar carrinho e criar payload
+                                const itens = Object.values(carrinho).map(item => {
+                                    // Limpar e converter o preço
+                                    let precoLimpo = item.preco?.replace(/[^\d,\.]/g, '') || '0';
+                                    if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+                                        precoLimpo = precoLimpo.replace(',', '');
+                                    } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+                                        precoLimpo = precoLimpo.replace(',', '.');
+                                    }
+                                    const precoEmCentavos = Math.round(parseFloat(precoLimpo) * 100);
+
+                                    return {
+                                        categoriaId: 42, // ID padrão para categoria
+                                        qtd: item.quantidade,
+                                        nomecat: item.nome,
+                                        valorTotal: parseFloat(precoLimpo),
+                                        obs: null,
+                                        pedidoitemadicionais: [],
+                                        composicao: [
+                                            {
+                                                produtoid: item.id || "0",
+                                                nomeprod: item.nome,
+                                                vlrvenda: precoEmCentavos,
+                                                idInput: null,
+                                                qtdInput: 0,
+                                                tempofab: 0
+                                            }
+                                        ],
+                                        senhaGarcom: "",
+                                        montavel: item.personalizado || false
+                                    };
+                                });
+
+                                const endereco = clienteData.enderecos[0];
+                                const payload = {
+                                    enderecoid: 0,
+                                    vlrentrega: 0,
+                                    retira: true,
+                                    status: 0,
+                                    obs: "",
+                                    mesa: "",
+                                    agendamentoid: 0,
+                                    dataAgendamento: null,
+                                    nomedocupom: "",
+                                    vlrcupom: 0,
+                                    troco: 0,
+                                    itens: itens,
+                                    endereco: {
+                                        bairroid: endereco.bairroid.toString(),
+                                        rua: endereco.rua,
+                                        nrocasa: endereco.nrocasa,
+                                        bairro: endereco.bairro,
+                                        usuario: {
+                                            enderecos: clienteData.enderecos,
+                                            id: clienteData.id,
+                                            celular: clienteData.celular,
+                                            cpf: clienteData.cpf,
+                                            empresaId: clienteData.empresaId,
+                                            nome: clienteData.nome,
+                                            sexo: clienteData.sexo,
+                                            empresa: null,
+                                            cartoesUsuario: [],
+                                            CartoesUsuario: []
+                                        },
+                                        textoendereco: null,
+                                        complemento: endereco.complemento || "",
+                                        meuspedidos: null
+                                    },
+                                    userAgent: navigator.userAgent,
+                                    descontouFidelidade: false,
+                                    pagamentos: [
+                                        {
+                                            formapgtoid: "17",
+                                            troco: 0,
+                                            codigopix: null,
+                                            CartaoId: null,
+                                            Cartao: null,
+                                            DataCartao: null,
+                                            NomeCartao: null,
+                                            cvv: null,
+                                            autorizado: null
+                                        }
+                                    ],
+                                    entregaGratis: false,
+                                    visitorId: generateVisitorId()
+                                };
+
+                                // Enviar pedido
+                                const pedidoUrl = `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`;
+                                chrome.runtime.sendMessage(
+                                    {
+                                        action: 'enviarPedidoAPI',
+                                        url: pedidoUrl,
+                                        payload: payload
+                                    },
+                                    (response) => {
+                                        if (response && response.success) {
+                                            alert('Pedido enviado com sucesso ao Painel!');
+                                            clearCart(); // Limpar carrinho após sucesso
+                                            togglePanel(); // Fechar painel
+                                        } else {
+                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}`);
+                                        }
+                                    }
+                                );
+
+                            } catch (error) {
+                                console.error('Erro ao processar dados do cliente:', error);
+                                alert('Erro ao processar dados do cliente.');
+                            }
+                        } else {
+                            console.error('Erro ao buscar dados do cliente:', response?.error);
+                            alert('Erro ao buscar dados do cliente.');
+                        }
+                    }
+                );
+            });
+
+        } catch (error) {
+            console.error('Erro ao enviar pedido ao painel:', error);
+            alert(`Erro ao processar pedido: ${error.message}`);
+        }
+    }
+
+    // Função para gerar visitor ID aleatório
+    function generateVisitorId() {
+        const characters = 'abcdef0123456789';
+        let visitorId = '';
+        for (let i = 0; i < 40; i++) {
+            visitorId += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return visitorId;
     }
 
     // Listener para mensagens do popup
@@ -1154,25 +1431,88 @@
         if (request.action === 'openPanel') {
             togglePanel();
             sendResponse({ success: true });
+        } else if (request.action === 'openClienteConfig') {
+            configurarDadosCliente()
+                .then(() => sendResponse({ success: true }))
+                .catch(() => sendResponse({ success: false, error: 'Erro ao configurar dados do cliente.' }));
         }
-        return true;
+        return true; // Indica que a resposta será assíncrona
     });
 
-    // Inicializar
-    function init() {
-        if (!checkWhatsAppPage()) return;
+    // Solicitar ou carregar URL padrão ao iniciar
+function solicitarOuCarregarURLPadrao() {
+    chrome.storage.local.get(['faminto_default_url'], function (result) {
+        let defaultUrl = result.faminto_default_url;
 
-        console.log('Iniciando extensão Faminto...');
-        createUI();
-        loadCart();
+        if (!defaultUrl) {
+            defaultUrl = prompt('Digite a URL padrão do cardápio do Faminto:', 'https://pedidos.faminto.app/app/7/44056498040');
+            if (defaultUrl && defaultUrl.startsWith('https://')) {
+                chrome.storage.local.set({ 'faminto_default_url': defaultUrl }, function () {
+                    console.log('URL padrão salva:', defaultUrl);
+                    extrairEmpresaIdECNPJ(defaultUrl);
+                });
+            } else {
+                alert('URL inválida. A extensão não funcionará corretamente sem uma URL padrão.');
+            }
+        } else {
+            console.log('URL padrão carregada:', defaultUrl);
+            extrairEmpresaIdECNPJ(defaultUrl);
+        }
+    });
+}
 
-        console.log('Extensão Faminto carregada com sucesso!');
-    }
+// Extrair empresaId e CNPJ da URL padrão
+function extrairEmpresaIdECNPJ(url) {
+    const match = url.match(/\/app\/(\d+)\/(\d+)/);
+    if (match) {
+        const empresaId = match[1];
+        const cnpj = match[2];
+        console.log('Empresa ID:', empresaId, 'CNPJ:', cnpj);
 
-    // Aguardar carregamento da página
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        // Salvar empresaId e CNPJ no armazenamento local
+        chrome.storage.local.set({ 'faminto_empresa_id': empresaId, 'faminto_cnpj': cnpj }, function () {
+            console.log('Empresa ID e CNPJ salvos no armazenamento local.');
+        });
     } else {
-        setTimeout(init, 1000); // Aguardar 1 segundo para o WhatsApp carregar
+        console.error('Erro ao extrair Empresa ID e CNPJ da URL:', url);
     }
+}
+
+// Modificar inicialização para incluir lógica de URL padrão
+function init() {
+    if (!checkWhatsAppPage()) return;
+
+    console.log('Iniciando extensão Faminto...');
+    solicitarOuCarregarURLPadrao();
+    createUI();
+    loadCart();
+    
+    // Carregar horários de atendimento
+    carregarHorariosAtendimento();
+    
+    // Atualizar status a cada minuto
+    setInterval(() => {
+        statusAtendimento = verificarAtendimentoAtivo();
+        updateHeaderStatus();
+    }, 60000);
+
+    if (!window.famintoApiInicializada) {
+        console.warn('API do Faminto não está disponível ainda.');
+    }
+
+    console.log('Extensão Faminto carregada com sucesso!');
+}
+
+// Verificar se estamos na página correta
+function checkWhatsAppPage() {
+    const url = window.location.href;
+    if (!url.includes('web.whatsapp.com')) {
+        console.warn('Extensão Faminto não está ativa na página correta.');
+        return false;
+    }
+    return true;
+}
+
+// Chamar init ao carregar o script
+init();
 })();
