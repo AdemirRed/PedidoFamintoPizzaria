@@ -223,10 +223,13 @@
         } else {
             carrinho[id] = {
                 ...produto,
-                produtoid: produto.id || "0", // Salvar o ID real do produto
+                // Garantir que o produtoid seja preservado corretamente
+                produtoid: produto.id || produto.produtoid,
                 quantidade: 1
             };
         }
+        
+        console.log('💾 Salvando no carrinho:', carrinho[id]);
         saveCart();
         updateCartDisplay();
     }
@@ -263,12 +266,23 @@
 
     function getCartTotal() {
         return Object.values(carrinho).reduce((total, item) => {
-            let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d,\.]/g, '') : '0'; // Verificar se item.preco é string
-            if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
-                precoLimpo = precoLimpo.replace(',', '');
-            } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
-                precoLimpo = precoLimpo.replace(',', '.');
+            // Limpar o preço removendo tudo exceto números e pontos
+            let precoLimpo = '';
+            if (typeof item.preco === 'string') {
+                precoLimpo = item.preco.replace(/[^\d.,]/g, ''); // Remove tudo exceto dígitos, vírgulas e pontos
+                // Converter vírgula para ponto se necessário
+                if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+                    precoLimpo = precoLimpo.replace(',', '.');
+                } else if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+                    // Se tem ambos, assume que vírgula é separador de milhares
+                    precoLimpo = precoLimpo.replace(',', '');
+                }
+            } else if (typeof item.preco === 'number') {
+                precoLimpo = item.preco.toString();
+            } else {
+                precoLimpo = '0';
             }
+            
             const preco = parseFloat(precoLimpo) || 0;
             return total + (preco * item.quantidade);
         }, 0);
@@ -1066,14 +1080,14 @@
                         <img class="produto-img" data-src="${produto.img}" src="${placeholderUrl}" alt="${produto.nome}">
                         <div class="produto-info">
                             <div class="produto-nome">${produto.nome}</div>
-                            <div class="produto-id" style="font-size: 11px; color: #bbb;">ID: ${produto.id}</div> <!-- Adicionar produtoid ao lado do nome -->
+                            <div class="produto-id" style="font-size: 11px; color: #bbb;">ID: ${produto.id}</div>
                             <div class="produto-preco">${produto.preco}</div>
                             <div class="produto-actions">
-                                <button class="add-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}">
+                                <button class="add-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-id="${produto.id}">
                                     + Carrinho
                                 </button>
                                 ${isPersonalizavel ? 
-                                `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}" data-id="${produto.id || ''}">
+                                `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}" data-id="${produto.id}">
                                     🔧 Personalizar
                                 </button>` : 
                                 ''}
@@ -1102,10 +1116,12 @@
             btn.onclick = () => {
                 const produto = {
                     nome: btn.dataset.nome,
-                    preco: formatarPreco(btn.dataset.preco), // Formatar preço corretamente
+                    preco: formatarPreco(btn.dataset.preco),
                     img: btn.dataset.img,
-                    id: btn.dataset.id // Adicionar produtoid
+                    id: btn.dataset.id, // Capturar o ID do dataset
+                    produtoid: btn.dataset.id // Garantir que produtoid seja definido
                 };
+                console.log('🛒 Adicionando produto ao carrinho:', produto);
                 addToCart(produto);
             };
         });
@@ -1115,9 +1131,10 @@
             btn.onclick = async () => {
                 const produto = {
                     nome: btn.dataset.nome,
-                    preco: formatarPreco(btn.dataset.preco), // Formatar preço corretamente
+                    preco: formatarPreco(btn.dataset.preco),
                     img: btn.dataset.img,
-                    id: btn.dataset.id
+                    id: btn.dataset.id,
+                    produtoid: btn.dataset.id // Garantir que produtoid seja definido
                 };
 
                 const produtoUrl = btn.dataset.url;
@@ -1154,13 +1171,23 @@
     }
 
     function formatarPreco(preco) {
-        let precoLimpo = preco?.replace(/[^\d,\.]/g, '') || '0';
-        if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
-            precoLimpo = precoLimpo.replace(',', '');
-        } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
-            precoLimpo = precoLimpo.replace(',', '.');
+        if (!preco) return 0;
+        
+        let precoLimpo = '';
+        if (typeof preco === 'string') {
+            precoLimpo = preco.replace(/[^\d.,]/g, ''); // Remove tudo exceto dígitos, vírgulas e pontos
+            // Converter vírgula para ponto se necessário
+            if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+                precoLimpo = precoLimpo.replace(',', '.');
+            } else if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+                // Se tem ambos, assume que vírgula é separador de milhares
+                precoLimpo = precoLimpo.replace(',', '');
+            }
+        } else if (typeof preco === 'number') {
+            return preco;
         }
-        return parseFloat(precoLimpo) || 0; // Retornar valor em formato numérico
+        
+        return parseFloat(precoLimpo) || 0;
     }
 
     // Mostrar carrinho
@@ -1173,11 +1200,22 @@
         } else {
             html += '<div class="carrinho-items">';
             items.forEach(item => {
+                // Garantir que o preço seja exibido corretamente
+                let precoExibicao = '';
+                if (typeof item.preco === 'string') {
+                    precoExibicao = item.preco.includes('R$') ? item.preco : `R$ ${item.preco}`;
+                } else if (typeof item.preco === 'number') {
+                    precoExibicao = `R$ ${item.preco.toFixed(2).replace('.', ',')}`;
+                } else {
+                    precoExibicao = 'R$ 0,00';
+                }
+
                 html += `
                     <div class="carrinho-item">
                         <img class="carrinho-img" data-src="${item.img}" src="${item.img}" alt="${item.nome}">
                         <div class="carrinho-info">
                             <div class="carrinho-nome">${item.nome}</div>
+                            ${item.produtoid ? `<div class="carrinho-id" style="font-size: 11px; color: #bbb;">ID: ${item.produtoid}</div>` : ''}
                             ${item.personalizado && item.sabores && item.sabores.length > 0 ?
                         `<div class="carrinho-sabores">Sabores: ${item.sabores.join(', ')}</div>` :
                         ''
@@ -1186,7 +1224,7 @@
                         `<div class="carrinho-complementos">Complementos: ${item.complementos.join(', ')}</div>` :
                         ''
                     }
-                            <div class="carrinho-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.', ',')}</div> <!-- Garantir formato "R$" -->
+                            <div class="carrinho-preco">${precoExibicao}</div>
                         </div>
                         <div class="quantity-controls">
                             <button class="qty-btn remove" data-action="remove" data-id="${item.nome}">-</button>
@@ -1200,7 +1238,7 @@
             const total = getCartTotal();
             html += `
                 <div class="carrinho-total">
-                    <div class="total-valor">Total: R$ ${total.toFixed(2).replace('.', ',')}</div> <!-- Garantir formato "R$" -->
+                    <div class="total-valor">Total: R$ ${total.toFixed(2).replace('.', ',')}</div>
                     <div class="carrinho-acoes">
                         <button class="enviar-btn" data-action="send-order" ${items.length === 0 ? 'disabled' : ''}>
                             <i class="ico-whatsapp"></i> Enviar via WhatsApp
@@ -1291,39 +1329,52 @@
                 const empresaId = result.faminto_empresa_id || '7';
                 const apiUrl = `https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/${empresaId}/${telefone}`;
 
+                console.log('🔍 Buscando dados do cliente:', { empresaId, telefone, apiUrl });
+
                 chrome.runtime.sendMessage(
                     { action: 'fetchApi', url: apiUrl },
                     (response) => {
                         if (response && response.success) {
                             try {
                                 const clienteData = JSON.parse(response.data);
+                                console.log('👤 Dados do cliente recebidos:', clienteData);
+                                
                                 if (!clienteData || !clienteData.id) {
                                     alert('Cliente não encontrado para o número fornecido.');
                                     return;
                                 }
 
                                 // Processar carrinho e criar payload
+                                console.log('🛒 Processando carrinho:', carrinho);
+                                
                                 const itens = Object.values(carrinho).map(item => {
-                                    let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d,\.]/g, '') : '0'; // Verificar se item.preco é string
-                                    if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
-                                        precoLimpo = precoLimpo.replace(',', '');
-                                    } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
-                                        precoLimpo = precoLimpo.replace(',', '.');
-                                    }
-                                    const precoEmCentavos = Math.round(parseFloat(precoLimpo) * 100);
+                                    let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d.]/g, '') : '0';
+                                    const precoEmReais = parseFloat(precoLimpo) || 0;
+                                    
+                                    // Garantir que o produtoid seja capturado corretamente
+                                    const produtoId = item.produtoid || item.id || null;
+                                    
+                                    console.log(`📦 Processando item: ${item.nome}`, {
+                                        precoOriginal: item.preco,
+                                        precoLimpo: precoLimpo,
+                                        precoEmReais: precoEmReais,
+                                        quantidade: item.quantidade,
+                                        produtoId: produtoId,
+                                        itemCompleto: item
+                                    });
 
                                     return {
-                                        categoriaId: item.categoriaId || 42, // ID padrão para categoria
+                                        categoriaId: item.categoriaId || 42,
                                         qtd: item.quantidade,
                                         nomecat: item.nome,
-                                        valorTotal: `R$ ${(parseFloat(precoLimpo) || 0).toFixed(2).replace('.', ',')}`, // Garantir formato "R$"
+                                        valorTotal: precoEmReais,
                                         obs: item.obs || null,
                                         pedidoitemadicionais: [],
                                         composicao: [
                                             {
-                                                produtoid: item.id || item.produtoid || "0", // Garantir que o ID real do produto seja usado
+                                                produtoid: produtoId, // Usar o produtoId capturado
                                                 nomeprod: item.nome,
-                                                vlrvenda: precoEmCentavos,
+                                                vlrvenda: precoEmReais,
                                                 idInput: null,
                                                 qtdInput: 0,
                                                 tempofab: 0
@@ -1335,6 +1386,8 @@
                                 });
 
                                 const endereco = clienteData.enderecos[0];
+                                console.log('🏠 Dados do endereço:', endereco);
+                                
                                 const payload = {
                                     enderecoid: 0,
                                     vlrentrega: 0,
@@ -1388,33 +1441,54 @@
                                     visitorId: generateVisitorId()
                                 };
 
+                                // Log detalhado do payload
+                                console.group('📋 DADOS ENVIADOS AO PAINEL');
+                                console.log('🎯 URL do pedido:', `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`);
+                                console.log('📊 Payload completo:', JSON.stringify(payload, null, 2));
+                                console.log('🛒 Itens do pedido:', payload.itens);
+                                console.log('👤 Dados do cliente:', payload.endereco.usuario);
+                                console.log('🏠 Endereço de entrega:', {
+                                    rua: payload.endereco.rua,
+                                    numero: payload.endereco.nrocasa,
+                                    bairro: payload.endereco.bairro.nome,
+                                    cidade: payload.endereco.bairro.cidade.nome
+                                });
+                                console.log('💰 Resumo financeiro:', {
+                                    valorEntrega: payload.vlrentrega,
+                                    retira: payload.retira,
+                                    troco: payload.troco,
+                                    totalItens: payload.itens.reduce((sum, item) => sum + (item.valorTotal * item.qtd), 0)
+                                });
+                                console.groupEnd();
+
                                 // Enviar pedido
                                 const pedidoUrl = `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`;
                                 chrome.runtime.sendMessage(
-                                    {
-                                        action: 'enviarPedidoAPI',
-                                        url: pedidoUrl,
-                                        payload: payload
-                                    },
+                                    { action: 'enviarPedidoAPI', url: pedidoUrl, payload: payload },
                                     (response) => {
+                                        console.group('📡 RESPOSTA DA API');
+                                        console.log('✅ Response completa:', response);
+                                        
                                         if (response && response.success) {
+                                            console.log('🎉 Pedido enviado com sucesso!');
+                                            console.log('📋 Dados retornados:', response.data);
                                             alert('Pedido enviado com sucesso ao Painel!');
-                                            clearCart(); // Limpar carrinho após sucesso
-                                            togglePanel(); // Fechar painel
+                                            clearCart();
+                                            togglePanel();
                                         } else {
-                                            console.error('Erro ao enviar pedido:', response?.error);
-                                            console.log('Dados enviados:', JSON.stringify(payload, null, 2)); // Exibir dados enviados para debug
-                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}\n\nConfira os dados enviados no console.`);
+                                            console.error('❌ Erro ao enviar pedido:', response?.error);
+                                            console.log('🔍 HTML retornado (se erro 500):', response?.html);
+                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}`);
                                         }
+                                        console.groupEnd();
                                     }
                                 );
-
                             } catch (error) {
-                                console.error('Erro ao processar dados do cliente:', error);
+                                console.error('❌ Erro ao processar dados do cliente:', error);
                                 alert('Erro ao processar dados do cliente.');
                             }
                         } else {
-                            console.error('Erro ao buscar dados do cliente:', response?.error);
+                            console.error('❌ Erro ao buscar dados do cliente:', response?.error);
                             alert('Erro ao buscar dados do cliente.');
                         }
                     }
@@ -1422,7 +1496,7 @@
             });
 
         } catch (error) {
-            console.error('Erro ao enviar pedido ao painel:', error);
+            console.error('❌ Erro geral ao enviar pedido ao painel:', error);
             alert(`Erro ao processar pedido: ${error.message}`);
         }
     }
