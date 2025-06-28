@@ -78,43 +78,52 @@ function salvarConfigCliente(config) {
 // Formatar o carrinho para o formato da API
 function formatarCarrinhoParaAPI(carrinho) {
     try {
-        // Extrair itens do carrinho
         const itensCarrinho = Object.values(carrinho);
-        
-        // Mapear itens do carrinho para o formato da API
+
         const itensFormatados = itensCarrinho.map(item => {
-            // Limpar e converter o preço para centavos
+            // Limpar e ajustar o preço para o formato correto
             let precoLimpo = item.preco?.replace(/[^\d,\.]/g, '') || '0';
             if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
                 precoLimpo = precoLimpo.replace(',', '');
             } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
                 precoLimpo = precoLimpo.replace(',', '.');
             }
-            const precoEmCentavos = Math.round(parseFloat(precoLimpo) * 100);
-            
-            // Criar objeto de item conforme esperado pela API
-            return {
-                categoriaId: 0, // Categorias não são suportadas diretamente na extensão
-                qtd: item.quantidade,
-                nomecat: item.nome,
-                valorTotal: precoEmCentavos / 100, // Valor em reais com 2 casas decimais
-                obs: item.obs || null,
-                pedidoitemadicionais: [],
-                composicao: [
+            const precoEmReais = parseFloat(precoLimpo) || 0;
+
+            // Capturar o produtoid corretamente
+            const produtoId = item.id && item.id !== "0" ? item.id : null;
+
+            if (!produtoId) {
+                console.warn(`Produto sem ID válido: ${item.nome}`);
+            }
+
+            // Determinar se o item deve ter composição
+            const composicao = produtoId
+                ? [
                     {
-                        produtoid: item.id || "0", // ID do produto se disponível
-                        nomeprod: item.nome,
-                        vlrvenda: precoEmCentavos, // Em centavos
+                        produtoid: produtoId,
+                        nomeprod: "",
+                        vlrvenda: precoEmReais,
                         idInput: null,
                         qtdInput: 0,
                         tempofab: 0
                     }
-                ],
+                ]
+                : []; // Não incluir composição para itens sem produtoid válido
+
+            return {
+                categoriaId: item.categoriaId || 0,
+                qtd: item.quantidade,
+                nomecat: item.nome,
+                valorTotal: precoEmReais, // Valor em reais
+                obs: item.obs || null,
+                pedidoitemadicionais: item.adicionais || [],
+                composicao: composicao, // Composição válida ou vazia
                 senhaGarcom: "",
                 montavel: item.personalizado || false
             };
         });
-        
+
         return itensFormatados;
     } catch (error) {
         console.error("Erro ao formatar carrinho para API:", error);
@@ -132,26 +141,13 @@ async function formatarPayloadAPI(carrinho) {
         throw new Error("Endereço do cliente não configurado corretamente.");
     }
 
-    // Calcular valor total do carrinho
-    const itensCarrinho = Object.values(carrinho);
-    let valorTotal = itensCarrinho.reduce((total, item) => {
-        let precoLimpo = item.preco?.replace(/[^\d,\.]/g, '') || '0';
-        if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
-            precoLimpo = precoLimpo.replace(',', '');
-        } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
-            precoLimpo = precoLimpo.replace(',', '.');
-        }
-        const preco = parseFloat(precoLimpo) || 0;
-        return total + (preco * item.quantidade);
-    }, 0);
-
     // Formatar itens do carrinho
     const itensFormatados = formatarCarrinhoParaAPI(carrinho);
 
     // Criar payload conforme formato esperado pela API
     const payload = {
         enderecoid: 0,
-        vlrentrega: clienteConfig.retira ? 0 : 10, // Valor padrão para entrega
+        vlrentrega: clienteConfig.retira ? 0 : clienteConfig.valorEntrega || 10,
         retira: clienteConfig.retira,
         status: 0,
         obs: "",
@@ -166,63 +162,22 @@ async function formatarPayloadAPI(carrinho) {
             bairroid: clienteConfig.bairroId,
             rua: clienteConfig.rua,
             nrocasa: clienteConfig.numero,
-            bairro: {
-                id: clienteConfig.bairroId,
-                nome: clienteConfig.bairroNome || "Bairro não especificado",
-                cidadeId: clienteConfig.cidadeId || 0,
-                empresaId: clienteConfig.empresaId || 7,
-                valorEntrega: clienteConfig.valorEntrega || 10,
-                bloqueado: false,
-                cidade: {
-                    id: clienteConfig.cidadeId || 0,
-                    empresaId: clienteConfig.empresaId || 7,
-                    nome: clienteConfig.cidadeNome || "Cidade não especificada",
-                    uf: clienteConfig.uf || "RS",
-                    valorEntrega: clienteConfig.valorEntrega || 10,
-                    entregaKm: false,
-                    ativo: true
-                }
-            },
+            complemento: clienteConfig.complemento || "",
             usuario: {
-                enderecos: [
-                    {
-                        id: 0,
-                        bairroid: clienteConfig.bairroId,
-                        nrocasa: clienteConfig.numero,
-                        rua: clienteConfig.rua,
-                        tipoendereco: "0",
-                        usuarioId: 0,
-                        complemento: clienteConfig.complemento || "",
-                        bairro: null
-                    }
-                ],
-                id: 0,
+                id: clienteConfig.id || 0,
+                nome: clienteConfig.nome || "Cliente Faminto",
                 celular: clienteConfig.celular,
                 cpf: clienteConfig.cpf,
                 empresaId: clienteConfig.empresaId || 7,
-                nome: clienteConfig.nome || "Cliente Faminto",
-                sexo: 0,
-                empresa: null,
-                cartoesUsuario: [],
-                CartoesUsuario: []
-            },
-            textoendereco: null,
-            complemento: clienteConfig.complemento || "",
-            meuspedidos: null
+                enderecos: clienteConfig.enderecos || []
+            }
         },
         userAgent: navigator.userAgent,
         descontouFidelidade: false,
         pagamentos: [
             {
-                formapgtoid: clienteConfig.formaPagamentoId || "1",
-                troco: clienteConfig.troco || 0,
-                codigopix: null,
-                CartaoId: null,
-                Cartao: null,
-                DataCartao: null,
-                NomeCartao: null,
-                cvv: null,
-                autorizado: null
+                formapgtoid: clienteConfig.formaPagamentoId || "17",
+                troco: clienteConfig.troco || 0
             }
         ],
         entregaGratis: false,

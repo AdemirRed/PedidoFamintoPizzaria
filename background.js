@@ -77,7 +77,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .then(response => {
             if (!response.ok) {
                 return response.text().then(text => {
-                    throw new Error(`Erro na API (${response.status}): ${text}`);
+                    if (response.status === 500) {
+                        sendResponse({ success: false, html: text }); // Retornar o HTML do erro
+                    } else {
+                        throw new Error(`Erro na API (${response.status}): ${text}`);
+                    }
                 });
             }
             return response.json();
@@ -89,6 +93,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(error => {
             console.error('Erro ao enviar pedido para API:', error);
             sendResponse({ success: false, error: error.message });
+        });
+
+        return true; // Indica que a resposta será assíncrona
+    }
+
+    if (request.action === 'calcularTotalCarrinho') {
+        chrome.storage.local.get(['faminto_cart'], function(result) {
+            const cart = result.faminto_cart || {};
+            const items = Object.values(cart);
+
+            const totalValue = items.reduce((total, item) => {
+                let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d,\.]/g, '') : '0';
+                if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+                    precoLimpo = precoLimpo.replace(',', '');
+                } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+                    precoLimpo = precoLimpo.replace(',', '.');
+                }
+                const preco = parseFloat(precoLimpo) || 0;
+                return total + (preco * item.quantidade);
+            }, 0);
+
+            sendResponse({ success: true, total: `R$ ${totalValue.toFixed(2).replace('.', ',')}` });
         });
 
         return true; // Indica que a resposta será assíncrona

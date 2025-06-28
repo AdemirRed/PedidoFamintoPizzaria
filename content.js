@@ -223,6 +223,7 @@
         } else {
             carrinho[id] = {
                 ...produto,
+                produtoid: produto.id || "0", // Salvar o ID real do produto
                 quantidade: 1
             };
         }
@@ -262,14 +263,12 @@
 
     function getCartTotal() {
         return Object.values(carrinho).reduce((total, item) => {
-            let precoLimpo = item.preco?.replace(/[^\d,\.]/g, '') || '0';
-
+            let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d,\.]/g, '') : '0'; // Verificar se item.preco é string
             if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
                 precoLimpo = precoLimpo.replace(',', '');
             } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
                 precoLimpo = precoLimpo.replace(',', '.');
             }
-
             const preco = parseFloat(precoLimpo) || 0;
             return total + (preco * item.quantidade);
         }, 0);
@@ -1067,17 +1066,17 @@
                         <img class="produto-img" data-src="${produto.img}" src="${placeholderUrl}" alt="${produto.nome}">
                         <div class="produto-info">
                             <div class="produto-nome">${produto.nome}</div>
+                            <div class="produto-id" style="font-size: 11px; color: #bbb;">ID: ${produto.id}</div> <!-- Adicionar produtoid ao lado do nome -->
                             <div class="produto-preco">${produto.preco}</div>
                             <div class="produto-actions">
                                 <button class="add-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}">
                                     + Carrinho
                                 </button>
-                                ${isPersonalizavel ?
-                        `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}" data-id="${produto.id || ''}">
-                                        🔧 Personalizar
-                                    </button>` :
-                        ''
-                    }
+                                ${isPersonalizavel ? 
+                                `<button class="customize-btn" data-nome="${produto.nome}" data-preco="${produto.preco}" data-img="${produto.img}" data-url="${url || ''}" data-id="${produto.id || ''}">
+                                    🔧 Personalizar
+                                </button>` : 
+                                ''}
                             </div>
                         </div>
                     </div>
@@ -1103,8 +1102,9 @@
             btn.onclick = () => {
                 const produto = {
                     nome: btn.dataset.nome,
-                    preco: btn.dataset.preco,
-                    img: btn.dataset.img
+                    preco: formatarPreco(btn.dataset.preco), // Formatar preço corretamente
+                    img: btn.dataset.img,
+                    id: btn.dataset.id // Adicionar produtoid
                 };
                 addToCart(produto);
             };
@@ -1115,7 +1115,7 @@
             btn.onclick = async () => {
                 const produto = {
                     nome: btn.dataset.nome,
-                    preco: btn.dataset.preco,
+                    preco: formatarPreco(btn.dataset.preco), // Formatar preço corretamente
                     img: btn.dataset.img,
                     id: btn.dataset.id
                 };
@@ -1153,6 +1153,16 @@
         if (loadOtherBtn) loadOtherBtn.onclick = requestUrl;
     }
 
+    function formatarPreco(preco) {
+        let precoLimpo = preco?.replace(/[^\d,\.]/g, '') || '0';
+        if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+            precoLimpo = precoLimpo.replace(',', '');
+        } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+            precoLimpo = precoLimpo.replace(',', '.');
+        }
+        return parseFloat(precoLimpo) || 0; // Retornar valor em formato numérico
+    }
+
     // Mostrar carrinho
     function showCart() {
         let html = createHeader() + '<div class="content">';
@@ -1165,7 +1175,7 @@
             items.forEach(item => {
                 html += `
                     <div class="carrinho-item">
-                        <img class="carrinho-img" data-src="${item.img}" src="${placeholderUrl}" alt="${item.nome}">
+                        <img class="carrinho-img" data-src="${item.img}" src="${item.img}" alt="${item.nome}">
                         <div class="carrinho-info">
                             <div class="carrinho-nome">${item.nome}</div>
                             ${item.personalizado && item.sabores && item.sabores.length > 0 ?
@@ -1176,7 +1186,7 @@
                         `<div class="carrinho-complementos">Complementos: ${item.complementos.join(', ')}</div>` :
                         ''
                     }
-                            <div class="carrinho-preco">${item.preco}</div>
+                            <div class="carrinho-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.', ',')}</div> <!-- Garantir formato "R$" -->
                         </div>
                         <div class="quantity-controls">
                             <button class="qty-btn remove" data-action="remove" data-id="${item.nome}">-</button>
@@ -1190,7 +1200,7 @@
             const total = getCartTotal();
             html += `
                 <div class="carrinho-total">
-                    <div class="total-valor">Total: R$ ${total.toFixed(2).replace('.', ',')}</div>
+                    <div class="total-valor">Total: R$ ${total.toFixed(2).replace('.', ',')}</div> <!-- Garantir formato "R$" -->
                     <div class="carrinho-acoes">
                         <button class="enviar-btn" data-action="send-order" ${items.length === 0 ? 'disabled' : ''}>
                             <i class="ico-whatsapp"></i> Enviar via WhatsApp
@@ -1294,8 +1304,7 @@
 
                                 // Processar carrinho e criar payload
                                 const itens = Object.values(carrinho).map(item => {
-                                    // Limpar e converter o preço
-                                    let precoLimpo = item.preco?.replace(/[^\d,\.]/g, '') || '0';
+                                    let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d,\.]/g, '') : '0'; // Verificar se item.preco é string
                                     if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
                                         precoLimpo = precoLimpo.replace(',', '');
                                     } else if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
@@ -1304,15 +1313,15 @@
                                     const precoEmCentavos = Math.round(parseFloat(precoLimpo) * 100);
 
                                     return {
-                                        categoriaId: 42, // ID padrão para categoria
+                                        categoriaId: item.categoriaId || 42, // ID padrão para categoria
                                         qtd: item.quantidade,
                                         nomecat: item.nome,
-                                        valorTotal: parseFloat(precoLimpo),
-                                        obs: null,
+                                        valorTotal: `R$ ${(parseFloat(precoLimpo) || 0).toFixed(2).replace('.', ',')}`, // Garantir formato "R$"
+                                        obs: item.obs || null,
                                         pedidoitemadicionais: [],
                                         composicao: [
                                             {
-                                                produtoid: item.id || "0",
+                                                produtoid: item.id || item.produtoid || "0", // Garantir que o ID real do produto seja usado
                                                 nomeprod: item.nome,
                                                 vlrvenda: precoEmCentavos,
                                                 idInput: null,
@@ -1393,7 +1402,9 @@
                                             clearCart(); // Limpar carrinho após sucesso
                                             togglePanel(); // Fechar painel
                                         } else {
-                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}`);
+                                            console.error('Erro ao enviar pedido:', response?.error);
+                                            console.log('Dados enviados:', JSON.stringify(payload, null, 2)); // Exibir dados enviados para debug
+                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}\n\nConfira os dados enviados no console.`);
                                         }
                                     }
                                 );

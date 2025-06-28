@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
     openPanelBtn.addEventListener('click', function() {
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
             chrome.tabs.sendMessage(tabs[0].id, {action: 'openPanel'}, function(response) {
-                if (chrome.runtime.lastError) {
+                if (chrome.runtime.lastError || !response?.success) {
                     alert('Erro: Recarregue a página do WhatsApp e tente novamente.');
                 } else {
                     window.close();
@@ -200,6 +200,55 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.error('Erro ao buscar dados do cliente:', response?.error);
                         alert('Erro ao buscar dados do cliente. Verifique o console para mais detalhes.');
+                    }
+                }
+            );
+        });
+    });
+
+    // Novo botão: Buscar ID do cliente pelo telefone
+    const buscarIdClienteBtn = document.createElement('button');
+    buscarIdClienteBtn.textContent = '🔍 Buscar ID do Cliente';
+    buscarIdClienteBtn.className = 'button button-secondary';
+    document.querySelector('.panel-section').appendChild(buscarIdClienteBtn);
+
+    buscarIdClienteBtn.addEventListener('click', function () {
+        const telefone = prompt('Digite o número de telefone do cliente (apenas números):');
+        if (!telefone || !/^\d+$/.test(telefone)) {
+            alert('Número de telefone inválido. Digite apenas números.');
+            return;
+        }
+
+        chrome.storage.local.get(['faminto_default_url'], function (result) {
+            const defaultUrl = result.faminto_default_url || '';
+            const empresaIdMatch = defaultUrl.match(/\/app\/(\d+)\//);
+            const empresaId = empresaIdMatch ? empresaIdMatch[1] : null;
+
+            if (!empresaId) {
+                alert('Erro: ID da empresa não encontrado na URL padrão do cardápio.');
+                return;
+            }
+
+            // Enviar mensagem ao background script para buscar ID do cliente
+            const apiUrl = `https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/${empresaId}/${telefone}`;
+            chrome.runtime.sendMessage(
+                { action: 'fetchApi', url: apiUrl },
+                (response) => {
+                    if (response && response.success) {
+                        try {
+                            const data = JSON.parse(response.data);
+                            if (data && data.id) {
+                                alert(`ID do cliente encontrado: ${data.id}`);
+                            } else {
+                                alert('Cliente não encontrado para o número fornecido.');
+                            }
+                        } catch (error) {
+                            console.error('Erro ao processar resposta da API:', error);
+                            alert('Erro ao buscar ID do cliente. Verifique o console para mais detalhes.');
+                        }
+                    } else {
+                        console.error('Erro ao buscar ID do cliente:', response?.error);
+                        alert('Erro ao buscar ID do cliente. Verifique o console para mais detalhes.');
                     }
                 }
             );

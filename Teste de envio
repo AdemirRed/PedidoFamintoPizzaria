@@ -1,0 +1,120 @@
+{
+    "enderecoid": 0,
+    "vlrentrega": 0,
+    "retira": true,
+    "status": 0,
+    "obs": "",
+    "mesa": "",
+    "agendamentoid": 0,
+    "dataAgendamento": null,
+    "nomedocupom": "",
+    "vlrcupom": 0,
+    "troco": 0,
+    "itens": [
+        {
+            "categoriaId": 42,
+            "qtd": 1,
+            "nomecat": "Pizza Broto",
+            "valorTotal": 45,
+            "obs": null,
+            "pedidoitemadicionais": [],
+            "composicao": [
+                {
+                    "produtoid": "0",
+                    "nomeprod": "Pizza Broto",
+                    "vlrvenda": 4500,
+                    "idInput": null,
+                    "qtdInput": 0,
+                    "tempofab": 0
+                }
+            ],
+            "senhaGarcom": "",
+            "montavel": false
+        }
+    ],
+    "endereco": {
+        "bairroid": "129",
+        "rua": "AAA",
+        "nrocasa": "9",
+        "bairro": {
+            "id": 129,
+            "nome": "Agricola",
+            "cidadeId": 7,
+            "empresaId": 7,
+            "valorEntrega": 10,
+            "bloqueado": false,
+            "cidade": {
+                "id": 7,
+                "empresaId": 7,
+                "nome": "Santa Rosa",
+                "uf": "RS",
+                "valorEntrega": 10,
+                "entregaKm": false,
+                "ativo": true
+            },
+            "minutoInicia": 0,
+            "minutoFinal": 1439
+        },
+        "usuario": {
+            "enderecos": [
+                {
+                    "id": 660880,
+                    "bairroid": 129,
+                    "nrocasa": "9",
+                    "rua": "AAA",
+                    "tipoendereco": "0",
+                    "usuarioId": 364954,
+                    "complemento": "",
+                    "bairro": {
+                        "id": 129,
+                        "nome": "Agricola",
+                        "cidadeId": 7,
+                        "empresaId": 7,
+                        "valorEntrega": 10,
+                        "bloqueado": false,
+                        "cidade": {
+                            "id": 7,
+                            "empresaId": 7,
+                            "nome": "Santa Rosa",
+                            "uf": "RS",
+                            "valorEntrega": 10,
+                            "entregaKm": false,
+                            "ativo": true
+                        },
+                        "minutoInicia": 0,
+                        "minutoFinal": 1439
+                    }
+                }
+            ],
+            "id": 364954,
+            "celular": "51999999999",
+            "cpf": "08718535070",
+            "empresaId": 7,
+            "nome": "Teste",
+            "sexo": 0,
+            "empresa": null,
+            "cartoesUsuario": [],
+            "CartoesUsuario": []
+        },
+        "textoendereco": null,
+        "complemento": "",
+        "meuspedidos": null
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "descontouFidelidade": false,
+    "pagamentos": [
+        {
+            "formapgtoid": "17",
+            "troco": 0,
+            "codigopix": null,
+            "CartaoId": null,
+            "Cartao": null,
+            "DataCartao": null,
+            "NomeCartao": null,
+            "cvv": null,
+            "autorizado": null
+        }
+    ],
+    "entregaGratis": false,
+    "visitorId": "80232a9c4ac8567e2b520580e397035c408d81af"
+}
