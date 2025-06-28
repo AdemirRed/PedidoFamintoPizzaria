@@ -1298,218 +1298,240 @@
         if (addProductsBtn) addProductsBtn.onclick = requestUrl;
     }
 
-    // Nova função simplificada para enviar pedido ao Painel
-    async function enviarPedidoPainel() {
-        try {
-            // Verificar se o carrinho está vazio
-            if (Object.keys(carrinho).length === 0) {
-                alert('O carrinho está vazio. Adicione produtos antes de enviar.');
-                return;
-            }
+    // Função para gerar visitor ID aleatório
+function generateVisitorId() {
+    const characters = 'abcdef0123456789';
+    let visitorId = '';
+    for (let i = 0; i < 40; i++) {
+        visitorId += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return visitorId;
+}
 
-            // Verificar se o atendimento está ativo
-            if (!statusAtendimento) {
-                const diaSemana = new Date().getDay();
-                const horarioHoje = horariosAtendimento.find(h => h.diaSemana === diaSemana);
-                const proximaAbertura = horarioHoje ? horarioHoje.horaAbre : 'Consulte os horários';
-                
-                alert(`🕐 Atendimento fechado no momento.\n\nPróxima abertura: ${proximaAbertura}\n\nTente novamente durante o horário de funcionamento.`);
-                return;
-            }
+// Nova função simplificada para enviar pedido ao Painel
+async function enviarPedidoPainel() {
+    try {
+        // Verificar se o carrinho está vazio
+        if (Object.keys(carrinho).length === 0) {
+            alert('O carrinho está vazio. Adicione produtos antes de enviar.');
+            return;
+        }
 
-            // Solicitar dados do cliente
-            const telefone = prompt('Digite o número de telefone do cliente (apenas números):');
-            if (!telefone || !/^\d+$/.test(telefone)) {
-                alert('Número de telefone inválido. Digite apenas números.');
-                return;
-            }
+        // Verificar se o atendimento está ativo
+        if (!statusAtendimento) {
+            const diaSemana = new Date().getDay();
+            const horarioHoje = horariosAtendimento.find(h => h.diaSemana === diaSemana);
+            const proximaAbertura = horarioHoje ? horarioHoje.horaAbre : 'Consulte os horários';
+            
+            alert(`🕐 Atendimento fechado no momento.\n\nPróxima abertura: ${proximaAbertura}\n\nTente novamente durante o horário de funcionamento.`);
+            return;
+        }
 
-            // Buscar dados do cliente via API
-            chrome.storage.local.get(['faminto_empresa_id'], async function (result) {
-                const empresaId = result.faminto_empresa_id || '7';
-                const apiUrl = `https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/${empresaId}/${telefone}`;
+        // Solicitar dados do cliente
+        const telefone = prompt('Digite o número de telefone do cliente (apenas números):');
+        if (!telefone || !/^\d+$/.test(telefone)) {
+            alert('Número de telefone inválido. Digite apenas números.');
+            return;
+        }
 
-                console.log('🔍 Buscando dados do cliente:', { empresaId, telefone, apiUrl });
+        // Buscar dados do cliente via API
+        chrome.storage.local.get(['faminto_empresa_id'], async function (result) {
+            const empresaId = result.faminto_empresa_id || '7';
+            const apiUrl = `https://pedidos.faminto.app/api/usuario/retornaUsuarioComEndereco/${empresaId}/${telefone}`;
 
-                chrome.runtime.sendMessage(
-                    { action: 'fetchApi', url: apiUrl },
-                    (response) => {
-                        if (response && response.success) {
-                            try {
-                                const clienteData = JSON.parse(response.data);
-                                console.log('👤 Dados do cliente recebidos:', clienteData);
-                                
-                                if (!clienteData || !clienteData.id) {
-                                    alert('Cliente não encontrado para o número fornecido.');
-                                    return;
+            console.log('🔍 Buscando dados do cliente:', { empresaId, telefone, apiUrl });
+
+            chrome.runtime.sendMessage(
+                { action: 'fetchApi', url: apiUrl },
+                (response) => {
+                    if (response && response.success) {
+                        try {
+                            const clienteData = JSON.parse(response.data);
+                            console.log('👤 Dados do cliente recebidos:', clienteData);
+                            
+                            if (!clienteData || !clienteData.id) {
+                                alert('Cliente não encontrado para o número fornecido.');
+                                return;
+                            }
+
+                            // Processar carrinho e criar payload
+                            console.log('🛒 Processando carrinho:', carrinho);
+                            
+                            const itens = Object.values(carrinho).map(item => {
+                                // Corrigir extração do preço
+                                let precoLimpo = '';
+                                if (typeof item.preco === 'string') {
+                                    // Remover 'R$' e outros caracteres, manter apenas números, vírgulas e pontos
+                                    precoLimpo = item.preco.replace(/[^\d,\.]/g, '');
+                                    // Converter vírgula para ponto se necessário
+                                    if (precoLimpo.includes(',') && !precoLimpo.includes('.')) {
+                                        precoLimpo = precoLimpo.replace(',', '.');
+                                    } else if (precoLimpo.includes(',') && precoLimpo.includes('.')) {
+                                        // Se tem ambos, assume que vírgula é separador de milhares
+                                        precoLimpo = precoLimpo.replace(',', '');
+                                    }
+                                } else if (typeof item.preco === 'number') {
+                                    precoLimpo = item.preco.toString();
+                                } else {
+                                    precoLimpo = '0';
                                 }
-
-                                // Processar carrinho e criar payload
-                                console.log('🛒 Processando carrinho:', carrinho);
                                 
-                                const itens = Object.values(carrinho).map(item => {
-                                    let precoLimpo = typeof item.preco === 'string' ? item.preco.replace(/[^\d.]/g, '') : '0';
-                                    const precoEmReais = parseFloat(precoLimpo) || 0;
-                                    
-                                    // Garantir que o produtoid seja capturado corretamente
-                                    const produtoId = item.produtoid || item.id || null;
-                                    
-                                    console.log(`📦 Processando item: ${item.nome}`, {
-                                        precoOriginal: item.preco,
-                                        precoLimpo: precoLimpo,
-                                        precoEmReais: precoEmReais,
-                                        quantidade: item.quantidade,
-                                        produtoId: produtoId,
-                                        itemCompleto: item
-                                    });
-
-                                    return {
-                                        categoriaId: item.categoriaId || 42,
-                                        qtd: item.quantidade,
-                                        nomecat: item.nome,
-                                        valorTotal: precoEmReais,
-                                        obs: item.obs || null,
-                                        pedidoitemadicionais: [],
-                                        composicao: [
-                                            {
-                                                produtoid: produtoId, // Usar o produtoId capturado
-                                                nomeprod: item.nome,
-                                                vlrvenda: precoEmReais,
-                                                idInput: null,
-                                                qtdInput: 0,
-                                                tempofab: 0
-                                            }
-                                        ],
-                                        senhaGarcom: "",
-                                        montavel: item.personalizado || false
-                                    };
+                                const precoUnitario = parseFloat(precoLimpo) || 0;
+                                const valorTotalItem = precoUnitario * item.quantidade; // Calcular valor total do item
+                                
+                                // Garantir que o produtoid seja capturado corretamente
+                                const produtoId = item.produtoid || item.id || null;
+                                
+                                console.log(`📦 Processando item: ${item.nome}`, {
+                                    precoOriginal: item.preco,
+                                    precoLimpo: precoLimpo,
+                                    precoUnitario: precoUnitario,
+                                    quantidade: item.quantidade,
+                                    valorTotalItem: valorTotalItem,
+                                    produtoId: produtoId,
+                                    itemCompleto: item
                                 });
 
-                                const endereco = clienteData.enderecos[0];
-                                console.log('🏠 Dados do endereço:', endereco);
-                                
-                                const payload = {
-                                    enderecoid: 0,
-                                    vlrentrega: 0,
-                                    retira: true,
-                                    status: 0,
-                                    obs: "",
-                                    mesa: "",
-                                    agendamentoid: 0,
-                                    dataAgendamento: null,
-                                    nomedocupom: "",
-                                    vlrcupom: 0,
-                                    troco: 0,
-                                    itens: itens,
-                                    endereco: {
-                                        bairroid: endereco.bairroid.toString(),
-                                        rua: endereco.rua,
-                                        nrocasa: endereco.nrocasa,
-                                        bairro: endereco.bairro,
-                                        usuario: {
-                                            enderecos: clienteData.enderecos,
-                                            id: clienteData.id,
-                                            celular: clienteData.celular,
-                                            cpf: clienteData.cpf,
-                                            empresaId: clienteData.empresaId,
-                                            nome: clienteData.nome,
-                                            sexo: clienteData.sexo,
-                                            empresa: null,
-                                            cartoesUsuario: [],
-                                            CartoesUsuario: []
-                                        },
-                                        textoendereco: null,
-                                        complemento: endereco.complemento || "",
-                                        meuspedidos: null
-                                    },
-                                    userAgent: navigator.userAgent,
-                                    descontouFidelidade: false,
-                                    pagamentos: [
+                                return {
+                                    categoriaId: item.categoriaId || 42,
+                                    qtd: item.quantidade,
+                                    nomecat: item.nome,
+                                    valorTotal: valorTotalItem, // Valor total do item (preço * quantidade)
+                                    obs: item.obs || null,
+                                    pedidoitemadicionais: [],
+                                    composicao: [
                                         {
-                                            formapgtoid: "17",
-                                            troco: 0,
-                                            codigopix: null,
-                                            CartaoId: null,
-                                            Cartao: null,
-                                            DataCartao: null,
-                                            NomeCartao: null,
-                                            cvv: null,
-                                            autorizado: null
+                                            produtoid: produtoId,
+                                            nomeprod: item.nome,
+                                            vlrvenda: precoUnitario, // Valor unitário do produto
+                                            idInput: null,
+                                            qtdInput: 0,
+                                            tempofab: 0
                                         }
                                     ],
-                                    entregaGratis: false,
-                                    visitorId: generateVisitorId()
+                                    senhaGarcom: "",
+                                    montavel: item.personalizado || false
                                 };
+                            });
 
-                                // Log detalhado do payload
-                                console.group('📋 DADOS ENVIADOS AO PAINEL');
-                                console.log('🎯 URL do pedido:', `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`);
-                                console.log('📊 Payload completo:', JSON.stringify(payload, null, 2));
-                                console.log('🛒 Itens do pedido:', payload.itens);
-                                console.log('👤 Dados do cliente:', payload.endereco.usuario);
-                                console.log('🏠 Endereço de entrega:', {
-                                    rua: payload.endereco.rua,
-                                    numero: payload.endereco.nrocasa,
-                                    bairro: payload.endereco.bairro.nome,
-                                    cidade: payload.endereco.bairro.cidade.nome
-                                });
-                                console.log('💰 Resumo financeiro:', {
-                                    valorEntrega: payload.vlrentrega,
-                                    retira: payload.retira,
-                                    troco: payload.troco,
-                                    totalItens: payload.itens.reduce((sum, item) => sum + (item.valorTotal * item.qtd), 0)
-                                });
-                                console.groupEnd();
-
-                                // Enviar pedido
-                                const pedidoUrl = `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`;
-                                chrome.runtime.sendMessage(
-                                    { action: 'enviarPedidoAPI', url: pedidoUrl, payload: payload },
-                                    (response) => {
-                                        console.group('📡 RESPOSTA DA API');
-                                        console.log('✅ Response completa:', response);
-                                        
-                                        if (response && response.success) {
-                                            console.log('🎉 Pedido enviado com sucesso!');
-                                            console.log('📋 Dados retornados:', response.data);
-                                            alert('Pedido enviado com sucesso ao Painel!');
-                                            clearCart();
-                                            togglePanel();
-                                        } else {
-                                            console.error('❌ Erro ao enviar pedido:', response?.error);
-                                            console.log('🔍 HTML retornado (se erro 500):', response?.html);
-                                            alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}`);
-                                        }
-                                        console.groupEnd();
+                            const endereco = clienteData.enderecos[0];
+                            console.log('🏠 Dados do endereço:', endereco);
+                            
+                            const payload = {
+                                enderecoid: 0,
+                                vlrentrega: 0,
+                                retira: true,
+                                status: 0,
+                                obs: "",
+                                mesa: "",
+                                agendamentoid: 0,
+                                dataAgendamento: null,
+                                nomedocupom: "",
+                                vlrcupom: 0,
+                                troco: 0,
+                                itens: itens,
+                                endereco: {
+                                    bairroid: endereco.bairroid.toString(),
+                                    rua: endereco.rua,
+                                    nrocasa: endereco.nrocasa,
+                                    bairro: endereco.bairro,
+                                    usuario: {
+                                        enderecos: clienteData.enderecos,
+                                        id: clienteData.id,
+                                        celular: clienteData.celular,
+                                        cpf: clienteData.cpf,
+                                        empresaId: clienteData.empresaId,
+                                        nome: clienteData.nome,
+                                        sexo: clienteData.sexo,
+                                        empresa: null,
+                                        cartoesUsuario: [],
+                                        CartoesUsuario: []
+                                    },
+                                    textoendereco: null,
+                                    complemento: endereco.complemento || "",
+                                    meuspedidos: null
+                                },
+                                userAgent: navigator.userAgent,
+                                descontouFidelidade: false,
+                                pagamentos: [
+                                    {
+                                        formapgtoid: "17",
+                                        troco: 0,
+                                        codigopix: null,
+                                        CartaoId: null,
+                                        Cartao: null,
+                                        DataCartao: null,
+                                        NomeCartao: null,
+                                        cvv: null,
+                                        autorizado: null
                                     }
-                                );
-                            } catch (error) {
-                                console.error('❌ Erro ao processar dados do cliente:', error);
-                                alert('Erro ao processar dados do cliente.');
-                            }
-                        } else {
-                            console.error('❌ Erro ao buscar dados do cliente:', response?.error);
-                            alert('Erro ao buscar dados do cliente.');
+                                ],
+                                entregaGratis: false,
+                                visitorId: generateVisitorId()
+                            };
+
+                            // Log detalhado do payload
+                            console.group('📋 DADOS ENVIADOS AO PAINEL');
+                            console.log('🎯 URL do pedido:', `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`);
+                            console.log('📊 Payload completo:', JSON.stringify(payload, null, 2));
+                            console.log('🛒 Itens do pedido:', payload.itens);
+                            console.log('👤 Dados do cliente:', payload.endereco.usuario);
+                            console.log('🏠 Endereço de entrega:', {
+                                rua: payload.endereco.rua,
+                                numero: payload.endereco.nrocasa,
+                                bairro: payload.endereco.bairro.nome,
+                                cidade: payload.endereco.bairro.cidade.nome
+                            });
+                            
+                            // Calcular totais corretamente
+                            const totalItensCalculado = payload.itens.reduce((sum, item) => sum + item.valorTotal, 0);
+                            console.log('💰 Resumo financeiro:', {
+                                valorEntrega: payload.vlrentrega,
+                                retira: payload.retira,
+                                troco: payload.troco,
+                                totalItens: totalItensCalculado,
+                                totalPedido: totalItensCalculado + payload.vlrentrega
+                            });
+                            console.groupEnd();
+
+                            // Enviar pedido
+                            const pedidoUrl = `https://pedidos.faminto.app/api/pedido/${empresaId}/${clienteData.cpf}/LinkDireto`;
+                            chrome.runtime.sendMessage(
+                                { action: 'enviarPedidoAPI', url: pedidoUrl, payload: payload },
+                                (response) => {
+                                    console.group('📡 RESPOSTA DA API');
+                                    console.log('✅ Response completa:', response);
+                                    
+                                    if (response && response.success) {
+                                        console.log('🎉 Pedido enviado com sucesso!');
+                                        console.log('📋 Dados retornados:', response.data);
+                                        alert('Pedido enviado com sucesso ao Painel!');
+                                        clearCart();
+                                        togglePanel();
+                                    } else {
+                                        console.error('❌ Erro ao enviar pedido:', response?.error);
+                                        console.log('🔍 HTML retornado (se erro 500):', response?.html);
+                                        alert(`Erro ao enviar pedido: ${response?.error || "Erro desconhecido."}`);
+                                    }
+                                    console.groupEnd();
+                                }
+                            );
+                        } catch (error) {
+                            console.error('❌ Erro ao processar dados do cliente:', error);
+                            alert('Erro ao processar dados do cliente.');
                         }
+                    } else {
+                        console.error('❌ Erro ao buscar dados do cliente:', response?.error);
+                        alert('Erro ao buscar dados do cliente.');
                     }
-                );
-            });
-
-        } catch (error) {
-            console.error('❌ Erro geral ao enviar pedido ao painel:', error);
-            alert(`Erro ao processar pedido: ${error.message}`);
-        }
+                }
+            );
+        });
+    } catch (error) {
+        console.error('❌ Erro geral ao enviar pedido ao painel:', error);
+        alert(`Erro ao processar pedido: ${error.message}`);
     }
-
-    // Função para gerar visitor ID aleatório
-    function generateVisitorId() {
-        const characters = 'abcdef0123456789';
-        let visitorId = '';
-        for (let i = 0; i < 40; i++) {
-            visitorId += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
-        return visitorId;
-    }
+}
 
     // Listener para mensagens do popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

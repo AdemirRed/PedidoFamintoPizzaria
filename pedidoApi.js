@@ -115,7 +115,6 @@ function formatarCarrinhoParaAPI(carrinho) {
                 categoriaId: item.categoriaId || 0,
                 qtd: item.quantidade,
                 nomecat: item.nome,
-                valorTotal: precoEmReais, // Enviar valor total como número decimal
                 obs: item.obs || null,
                 pedidoitemadicionais: item.adicionais || [],
                 composicao: composicao, // Composição válida ou vazia
